@@ -29,11 +29,7 @@ def press_and_find(key='a', image='images/tritium.png', max_tries=10, confidence
 
 
 def refuel():
-    n = 3
-    while n > 0:
-        print("t-{}".format(n))
-        sleep(1)
-        n -= 1
+    sleep(1)
     load_tritium()
     donate_tritium()
     load_tritium()   # keep fully loaded to reduce tritium consumption
@@ -64,10 +60,15 @@ def donate_tritium():
     if not press_and_find('\b', 'images/carrier_services.png'): return
     press('space')
     if not press_and_find('s', 'images/tritium_depot.png'): return
+    press('space')
     sleep(0.5)
+    if not press_and_find('w', 'images/donate_tritium.png'): return
     press('space')
     if not press_and_find('w', 'images/confirm_deposit.png'): return
+    press('space')
     set_status('tritium donated')
+    if not press_and_find('s', 'images/exit_door.png'): return
+    press('space')
     if not press_and_find('\b', 'images/carrier_services.png'): return
 
 
@@ -75,14 +76,15 @@ root = Tk()
 frame = ttk.Frame(root, padding=10)
 frame.grid()
 ttk.Label(frame, text="Fleet Carrier Tools").grid(column=0, row=0)
-ttk.Button(frame, text="Refuel Ctrl+F11", command=refuel).grid(column=0, row=1)
+ttk.Label(frame, text="Refuel").grid(column=0, row=1)
+ttk.Label(frame, text="Ctrl+F11").grid(column=1, row=1)
 status = ttk.Label(frame, text="this is the status bar --- nice and wide")
-status.grid(column=0, row=2)
+status.grid(column=0, row=2, columnspan=2)
 ttk.Button(frame, text="Quit", command=root.destroy).grid(column=0, row=3)
 
 
 def set_status(msg=''):
-    status.config(text="ctrl+f11 pressed")
+    status.config(text=msg)
     root.update_idletasks()
 
 
