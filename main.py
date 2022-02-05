@@ -8,6 +8,9 @@ from time import sleep
 import glob
 import getpass
 import os
+import usersettings
+
+debug = True
 
 current_system = ''
 jumping = False
@@ -18,7 +21,7 @@ next_waypoint = ''
 route_file = ""
 is_odyssey = False
 
-carrier_services_set = ['images/carrier_services.png',   # cutter
+carrier_services_set = ['images/carrier_services.png',  # cutter
                         'images/carrier_services2.png',  # dolphin
                         'images/carrier_services3.png',  # type 9
                         'images/carrier_services4.png',  # mamba
@@ -36,42 +39,45 @@ def get_lastest_log_file():
 
 
 # Load and parse the route.csv
-def load_route(route_file):
+def load_route(route_file_name):
     global route
+    route = [] # Clear prior route
 
-    with open(route_file, 'r') as f:
-        row = 0
+    with open(route_file_name, 'r') as f:
+        cnt = 0
         while True:
             line = f.readline()
             parts = line.strip().split(",")
             if len(line) == 0:
                 update_route_position()
                 set_status("Loaded route with {} systems".format(len(route)))
-                return # Done with file
-            if row == 0:
+                return  # Done with file
+            if cnt == 0:
                 if parts[0].strip('"') != 'System Name':
                     set_status("Invalid route file, first column must be System Name")
                     return
             else:
                 system = parts[0].strip('"')
                 route.append(system)
-            row += 1
+            cnt += 1
 
 
 # Press down key for down_time and wait after for delay
 def press(key, delay=0.1, down_time=0.2):
+    out = key
     if key == '\b':
-        print("Press: backspace")
+        out = "Press: backspace"
     elif key == '\t':
-        print("Press: tab")
+        out = "Press: tab"
     elif key == '\r':
-        print("Press: return")
+        out = "Press: return"
     elif key == '\n':
-        print("Press: newline")
+        out = "Press: newline"
     elif key == ' ':
-        print("Press: space")
+        out = "Press: space"
     else:
-        print("Press: ", key)
+        out = "Press: " + key
+    if debug: print(out)
     kb.press(key)
     sleep(down_time)
     kb.release(key)
@@ -114,10 +120,15 @@ def mouse_click_at(x, y, pause=0.25, click_duration=0.25):
     pyautogui.mouseUp()
 
 
-# Macro to schedule a jump
+# Callback to schedule a jump
 def schedule_jump():
+    find_system_and_jump()
+
+
+# Macro to schedule a jump
+def find_system_and_jump():
     global jumping
-    if len(next_waypoint) < 3 or not auto_jump: return
+    if len(next_waypoint) < 3 or not auto_jump: return False
 
     if do_refuel.get() == 1:
         refuel()
@@ -154,13 +165,15 @@ def schedule_jump():
         return False
     x, y = pos.left + pos.width // 2, pos.top + pos.height // 2
     mouse_click_at(x, y)
-    print('Jump set for', next_waypoint)
     set_status("Jump set for {}".format(next_waypoint))
     jumping = True
+
+    if not press_and_find_set('\b', carrier_services_set): return False
+    press('space')
     return True
 
 
-# Macro to refuel the ship, the carrier and then the ship
+# Callback to refuel the ship, the carrier and then the ship
 # to optimise carrier mass and save up to 1 ton of fuel per jump
 def refuel():
     set_status('Refueling')
@@ -170,6 +183,7 @@ def refuel():
     if not load_tritium(): return  # keep fully loaded to reduce tritium consumption
 
 
+# Refill ship with tritium
 def load_tritium():
     set_status('Filling ship with tritium')
     if not press_and_find_set('\b', carrier_services_set): return False
@@ -196,6 +210,7 @@ def load_tritium():
     return True
 
 
+# Donate tritium
 def donate_tritium():
     set_status('Donating tritium')
     if not press_and_find_set('\b', carrier_services_set): return False
@@ -215,13 +230,17 @@ def donate_tritium():
     return True
 
 
+# Select route file dialog
 def select_route_file():
     global route_file
     route_file = fd.askopenfilename()
     route_label.config(text=route_file)
     load_route(route_file)
+    settings.route_file = route_file
+    settings.save_settings()
 
 
+# Update UI with route details and find next waypoint
 def update_route_position():
     global next_waypoint, jumping
     if len(route) == 0: return
@@ -237,7 +256,7 @@ def update_route_position():
 
     for r in route:
         if r == current_system:
-            next_waypoint = route[n+1]
+            next_waypoint = route[n + 1]
             route_pos_label.config(text="At waypoint {}, next is {}".format(n, next_waypoint))
             return
         n += 1
@@ -246,72 +265,96 @@ def update_route_position():
 
 # Setup UI
 root = Tk()
+root.title("Fleet Carrier Tools")
+root.iconbitmap('images/fc_icon.ico')
 
 do_refuel = tkinter.IntVar()
 
 frame = ttk.Frame(root, padding=10)
 frame.grid()
-r = 0
-ttk.Label(frame, text="Fleet Carrier Tools").grid(column=0, row=r)
-r += 1
+row = 0
+ttk.Label(frame, text="Fleet Carrier Tools").grid(column=0, row=row)
+row += 1
 
-ttk.Label(frame, text="Refuel Carrier:").grid(column=0, row=r, sticky="e")
-ttk.Label(frame, text="Ctrl+F11").grid(column=1, row=r, sticky="w")
-r += 1
+ttk.Label(frame, text="Refuel Carrier:").grid(column=0, row=row, sticky="e")
+ttk.Label(frame, text="Ctrl+F11").grid(column=1, row=row, sticky="w")
+row += 1
 
-ttk.Label(frame, text="Enable autojump:").grid(column=0, row=r, sticky="e")
-ttk.Label(frame, text="Ctrl+F12").grid(column=1, row=r, sticky="w")
-r += 1
+ttk.Label(frame, text="Enable autojump:").grid(column=0, row=row, sticky="e")
+ttk.Label(frame, text="Ctrl+F12").grid(column=1, row=row, sticky="w")
+row += 1
 
-ttk.Label(frame, text="Cancel autojump:").grid(column=0, row=r, sticky="e")
-ttk.Label(frame, text="Ctrl+F10").grid(column=1, row=r, sticky="w")
-r += 1
+ttk.Label(frame, text="Cancel autojump:").grid(column=0, row=row, sticky="e")
+ttk.Label(frame, text="Ctrl+F10").grid(column=1, row=row, sticky="w")
+row += 1
 
-ttk.Separator(frame, orient="horizontal").grid(column=0, row=r, columnspan=2, sticky="ew")
-r += 1
+ttk.Separator(frame, orient="horizontal").grid(column=0, row=row, columnspan=2, sticky="ew")
+row += 1
 
-ttk.Label(frame, text="Current System:").grid(column=0, row=r,sticky="e")
+ttk.Label(frame, text="Current System:").grid(column=0, row=row, sticky="e")
 system_label = ttk.Label(frame, text="Unknown")
-system_label.grid(column=1, row=r, sticky="w")
-r += 1
+system_label.grid(column=1, row=row, sticky="w")
+row += 1
 
-ttk.Button(frame, text="Select Route", command=select_route_file).grid(column=0, row=r, sticky="e")
+ttk.Button(frame, text="Select Route", command=select_route_file).grid(column=0, row=row, sticky="e")
 route_label = ttk.Label(frame, text="Unknown")
-route_label.grid(column=1, row=r, sticky="w")
-r += 1
+route_label.grid(column=1, row=row, sticky="w")
+row += 1
 
-ttk.Label(frame, text="Refuel on jump?").grid(column=0, row=r,sticky="e")
-ttk.Checkbutton(frame, variable=do_refuel).grid(column=1, row=r, sticky="w")
-r += 1
+ttk.Label(frame, text="Refuel on jump?").grid(column=0, row=row, sticky="e")
+ttk.Checkbutton(frame, variable=do_refuel).grid(column=1, row=row, sticky="w")
+row += 1
 
-ttk.Label(frame, text="Destination:").grid(column=0, row=r,sticky="e")
+ttk.Label(frame, text="Destination:").grid(column=0, row=row, sticky="e")
 route_len_label = ttk.Label(frame, text="Unknown")
-route_len_label.grid(column=1, row=r, sticky="w")
-r += 1
+route_len_label.grid(column=1, row=row, sticky="w")
+row += 1
 
-ttk.Label(frame, text="Progress:").grid(column=0, row=r,sticky="e")
+ttk.Label(frame, text="Progress:").grid(column=0, row=row, sticky="e")
 route_pos_label = ttk.Label(frame, text="Unknown")
-route_pos_label.grid(column=1, row=r, sticky="w")
-r += 1
+route_pos_label.grid(column=1, row=row, sticky="w")
+row += 1
 
-ttk.Separator(frame, orient="horizontal").grid(column=0, row=r, columnspan=2, sticky="ew")
-r += 1
+ttk.Separator(frame, orient="horizontal").grid(column=0, row=row, columnspan=2, sticky="ew")
+row += 1
 
 status = ttk.Label(frame, text="")
-status.grid(column=0, row=r, columnspan=2, sticky="w")
+status.grid(column=0, row=row, columnspan=2, sticky="w")
+row += 1
 
-r += 1
-ttk.Button(frame, text="Quit", command=root.destroy).grid(column=0, row=r)
+ttk.Label(frame, text="                                                                                               ").grid(column=0, row=row, columnspan=2, sticky="w")
+
+
+row += 1
+ttk.Button(frame, text="Quit", command=root.destroy).grid(column=0, row=row)
 
 
 def cool_down_complete():
     global cool_down
     cool_down = False
-    print("Carrier cool down compete")
     set_status("Carrier cool down complete")
-    if jumping:
+    if auto_jump:
         schedule_jump()
 
+
+def get_value_from_log_line(line, key):
+    parts = line.strip('{} ').split(',')
+    for p in parts:
+        keys = p.split(':')
+        k = keys[0].strip('" ')
+        if k == key:
+            return keys[1].strip('" ')
+    return ''
+
+
+def check_newer_log():
+    global ed_log, log
+    newest = get_lastest_log_file()
+    if log != newest:
+        ed_log.close()
+        print("Opening newer E:D log: ", log)
+        ed_log = open(log, 'r')
+    root.after(10000, check_newer_log)
 
 def process_log():
     global current_system, jumping, cool_down, is_odyssey
@@ -324,15 +367,14 @@ def process_log():
         if line.count('StarSystem') > 0:
             curr_sys = line
         if line.count('Odyssey') > 0:
-            parts = line.split(',')
-            for p in parts:
-                keys = p.split(':')
-                k = keys[0].strip('" ')
-                if k == 'Odyssey':
-                    ody = keys[1]
-                    if ody == "true":
-                        is_odyssey = True
-                        print("We're in Odyssey")
+            ody = get_value_from_log_line(line, 'Odyssey')
+            if ody == "true":
+                is_odyssey = True
+                print("We're in Odyssey")
+        if line.count('CarrierJumpRequest') > 0:
+            dest = get_value_from_log_line(line, 'SystemName')
+            if dest == next_waypoint:
+                set_status("Jump to {} confirmed".format(dest))
 
     if curr_sys > '':
         new_system = curr_sys.split('"StarSystem":"')[1].split('"')[0]
@@ -341,8 +383,8 @@ def process_log():
             if jumping:
                 jumping = False
                 cool_down = True
-                root.after(1000 * 180, cool_down_complete)
-            print("Current system=", current_system)
+                root.after(1000 * 210, cool_down_complete)
+            set_status("Current system: " + current_system)
             system_label.config(text=current_system)
             update_route_position()
             root.update_idletasks()
@@ -350,30 +392,62 @@ def process_log():
     root.after(1000, process_log)
 
 
+# Set a status message
 def set_status(msg=''):
     status.config(text=msg)
+    if debug:
+        print(msg)
     root.update_idletasks()
 
 
+# Check for our macro keys being pressed
 def check_keys():
     global auto_jump
     if kb.is_pressed('ctrl+f11'):
         set_status("Refuel requested")
         root.after(100, refuel())
+        root.after(1000, check_keys)
+        return
     if kb.is_pressed('ctrl+f12'):
         set_status("Enable auto jump")
         auto_jump = True
-        root.after(100, schedule_jump())
+        root.after(100, schedule_jump)
+        root.after(1000, check_keys)
+        return
     if kb.is_pressed('ctrl+f10'):
         set_status("Auto jump disabled")
         auto_jump = False
     root.after(20, check_keys)
 
+settings = usersettings.Settings('com.ed.fcmacros')
+settings.add_setting("route_file", str, default="")
+settings.add_setting("refuel", int, default=1)
+
+settings.load_settings()
+do_refuel.set(settings.refuel)
+
+
+def check_settings():
+    global route_file
+    if route_file == '' and settings.route_file > '':
+        route_file = settings.route_file
+        route_label.config(text=route_file)
+        load_route(route_file)
+    elif route_file != settings.route_file:
+        settings.route_file = route_file
+
+    settings.refuel = do_refuel.get()
+    settings.save_settings()
+
+    root.after(1000, check_settings)
+
 
 log = get_lastest_log_file()
 print("Opening E:D log: ", log)
 ed_log = open(log, 'r')
-process_log()  # start log processing
+check_newer_log()  # Start checking for log rotation
 
+process_log()  # start log processing
+check_settings() # start monitoring settings
 check_keys()  # start key monitoring
 root.mainloop()  # run
