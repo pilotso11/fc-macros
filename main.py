@@ -114,11 +114,10 @@ def mouse_click_at(x, y, pause=0.25, click_duration=0.25):
     pyautogui.mouseUp()
 
 
+# Macro to schedule a jump
 def schedule_jump():
+    global jumping
     if len(next_waypoint) < 3 or not auto_jump: return
-    use_mouse = False
-
-    set_status('Refueling')
 
     if do_refuel.get() == 1:
         refuel()
@@ -126,39 +125,45 @@ def schedule_jump():
     set_status('Finding next waypoint')
 
     # Back to main menu
-    if not press_and_find_set('\b', carrier_services_set): return
+    if not press_and_find_set('\b', carrier_services_set): return False
     press('space')
-    if not press_and_find('s', 'images/tritium_depot.png'): return
-    if not press_and_find('w', 'images/carrier_management.png'): return
+    if not press_and_find('s', 'images/tritium_depot.png'): return False
+    if not press_and_find('d', 'images/carrier_management.png'): return False
     press('space')
     sleep(2)
-    if not press_and_find('s', 'images/navigation.png'): return
+    if not press_and_find('s', 'images/navigation.png'): return False
     press('space')
     sleep(0.5)
-    if not press_and_find('s', 'images/open_galmap.png'): return
+    if not press_and_find('s', 'images/open_galmap.png'): return False
     press('space')
-    sleep(5)
+    sleep(3)
 
-    if use_mouse:
-        pos = pyautogui.locateOnScreen('images/search_the_galaxy.png', confidence=0.75)
-        if pos is None:
-            set_status("Unable to find search")
-            return
-        x, y = pos.left + pos.width // 2, pos.top + pos.height // 2
-        mouse_click_at(x, y)
-        kb.write(next_waypoint)
-    else:
-        press('up')
-        kb.write(next_waypoint)
-        press('down')
-        press('space')
+    pos = pyautogui.locateOnScreen('images/search_the_galaxy.png', confidence=0.75)
+    if pos is None:
+        set_status("Unable to find search")
+        return False
+    x, y = pos.left + pos.width // 2, pos.top + pos.height // 2
+    mouse_click_at(x, y)
+    kb.write(next_waypoint)
+    sleep(1)
+    mouse_click_at(x, y + pos.height)
+    sleep(2)
+    pos = pyautogui.locateOnScreen('images/set_carrier_destination.png', confidence=0.75)
+    if pos is None:
+        set_status("Unable to find set carrier destination")
+        return False
+    x, y = pos.left + pos.width // 2, pos.top + pos.height // 2
+    mouse_click_at(x, y)
+    print('Jump set for', next_waypoint)
+    set_status("Jump set for {}".format(next_waypoint))
+    jumping = True
+    return True
 
-    sleep(5)
-    if not press_and_find('space', 'images/set_carrier_destination.png'): return
-    print('Ready to set jump')
 
-
+# Macro to refuel the ship, the carrier and then the ship
+# to optimise carrier mass and save up to 1 ton of fuel per jump
 def refuel():
+    set_status('Refueling')
     sleep(1)
     if not load_tritium(): return
     if not donate_tritium(): return
@@ -353,14 +358,14 @@ def set_status(msg=''):
 def check_keys():
     global auto_jump
     if kb.is_pressed('ctrl+f11'):
-        set_status("ctrl+f11 pressed")
+        set_status("Refuel requested")
         root.after(100, refuel())
     if kb.is_pressed('ctrl+f12'):
-        set_status("ctrl+f12 pressed")
+        set_status("Enable auto jump")
         auto_jump = True
         root.after(100, schedule_jump())
     if kb.is_pressed('ctrl+f10'):
-        set_status("ctrl+f10 pressed")
+        set_status("Auto jump disabled")
         auto_jump = False
     root.after(20, check_keys)
 
