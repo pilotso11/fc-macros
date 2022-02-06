@@ -1,4 +1,4 @@
-# macros.py
+# fcmacros.py
 # Elite Dangerous Fleet Carrier Macros - autopilot/auto jumper
 # Copyright (c) 2022 Seth Osher
 #
@@ -13,6 +13,8 @@ import glob
 import getpass
 import os
 import usersettings
+import PIL
+import cv2
 from keymaps import *
 
 
@@ -349,14 +351,14 @@ ttk.Label(frame, text="Ctrl+F5").grid(column=3, row=row, sticky="w")
 row += 1
 
 ttk.Label(frame, text="Enable autojump:").grid(column=0, row=row, sticky="e")
-ttk.Label(frame, text="Ctrl+F9").grid(column=1, row=row, sticky="w")
+ttk.Label(frame, text="Alt+F9").grid(column=1, row=row, sticky="w")
 
 ttk.Label(frame, text="Cancel autojump:").grid(column=2, row=row, sticky="e")
 ttk.Label(frame, text="Ctrl+F10").grid(column=3, row=row, sticky="w")
 row += 1
 
 ttk.Label(frame, text="Engage next jump on route:").grid(column=0, row=row, sticky="e")
-ttk.Label(frame, text="Alt+F9").grid(column=1, row=row, sticky="w")
+ttk.Label(frame, text="Ctrl+F9").grid(column=1, row=row, sticky="w")
 row += 1
 
 
@@ -494,14 +496,14 @@ def check_keys():
         root.after(100, empty_cargo)
         root.after(1000, check_keys)
         return
-    if kb.is_pressed('ctrl+f9'):
+    if kb.is_pressed('alt+f9'):
         set_status("Enable auto jump")
         auto_jump = True
         auto_jump_label.config(text="Auto Jump Enabled")
         root.after(100, schedule_jump)
         root.after(1000, check_keys)
         return
-    if kb.is_pressed('alt+f9'):
+    if kb.is_pressed('ctrl+f9'):
         set_status("Scheduling next jump")
         jump_one = True
         root.after(100, schedule_jump)

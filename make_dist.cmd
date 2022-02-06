@@ -1,0 +1,2 @@
+pyinstaller fcmacros.spec --noconfirm
+

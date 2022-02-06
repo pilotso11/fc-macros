@@ -2,8 +2,8 @@
 Elite Dangerous Fleet Carrier Macros
 There are 3 primary macros:
 * Ctrl+F11: Refill your ship with Tritium and donate it to the carrier.
-* Alt+F9: Schedule the next jump on the route
-* Ctrl+F9: Auto jump the remaining route
+* Ctrl+F9: Schedule the next jump on the route
+* Alt+F9: Auto jump the remaining route
   * Ctrl+F10: Stop auto jumping
 * Ctrl+F5: Empty your ship's cargo to the carrier.
 
