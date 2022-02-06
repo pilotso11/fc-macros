@@ -1,5 +1,6 @@
 # These are the default keybindings
 # Change these if you have non standard settings
+# See also https://github.com/boppreh/keyboard/blob/master/keyboard/_canonical_names.py
 ED_BACK = '\b'
 ED_RIGHT_WINDOW = '4'
 ED_LEFT_WINDOW = '1'

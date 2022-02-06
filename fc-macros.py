@@ -1,3 +1,7 @@
+# fc-macros.py
+# Elite Dangerous Fleet Carrier Macros - autopilot/auto jumper
+# Copyright (c) 2022 Seth Osher
+#
 import tkinter
 from tkinter import *
 from tkinter import ttk
@@ -11,7 +15,6 @@ import os
 import usersettings
 from keymaps import *
 
-DEBUG = True
 
 current_system = ''
 jumping = False
@@ -22,6 +25,7 @@ route = []
 next_waypoint = ''
 route_file = ""
 is_odyssey = False
+_DEBUG = False
 
 carrier_services_set = ['images/carrier_services.png',  # cutter
                         'images/carrier_services2.png',  # dolphin
@@ -42,26 +46,32 @@ def get_latest_log_file():
 
 # Load and parse the route.csv
 def load_route(route_file_name):
-    global route
+    global route, route_file
     route = []  # Clear prior route
+    if len(route_file_name) < 4: return
 
     with open(route_file_name, 'r') as f:
         cnt = 0
         while True:
-            line = f.readline()
-            parts = line.strip().split(",")
-            if len(line) == 0:
-                update_route_position()
-                set_status("Loaded route with {} systems".format(len(route)))
-                return  # Done with file
-            if cnt == 0:
-                if parts[0].strip('"') != 'System Name':
-                    set_status("Invalid route file, first column must be System Name")
-                    return
-            else:
-                system = parts[0].strip('"')
-                route.append(system)
-            cnt += 1
+            try:
+                line = f.readline()
+                parts = line.strip().split(",")
+                if len(line) == 0:
+                    update_route_position()
+                    set_status("Loaded route with {} systems".format(len(route)))
+                    return  # Done with file
+                if cnt == 0:
+                    if parts[0].strip('"') != 'System Name':
+                        set_status("Invalid route file, first column must be System Name")
+                        route_file = ""
+                        return
+                else:
+                    system = parts[0].strip('"')
+                    route.append(system)
+                cnt += 1
+            except (RuntimeError, UnicodeDecodeError):
+                set_status("Invalid route file, first column must be System Name")
+                route_file = ""
 
 
 # Press down key for down_time and wait after for delay
@@ -78,7 +88,7 @@ def press(key, delay=0.1, down_time=0.2):
         out = "Press: space"
     else:
         out = "Press: " + key
-    if DEBUG: print(out)
+    if DEBUG.get() == 1: print(out)
     kb.press(key)
     sleep(down_time)
     kb.release(key)
@@ -141,7 +151,9 @@ def find_system_and_jump():
     if len(next_waypoint) < 3 or not (auto_jump or jump_one): return False
 
     if do_refuel.get() == 1:
-        refuel()
+        if not load_tritium(): return False
+        if not donate_tritium(): return False
+        if not load_tritium(): return False
 
     if jump_one: jump_one = False
 
@@ -271,7 +283,7 @@ def select_route_file():
 
 # Update UI with route details and find next waypoint
 def update_route_position():
-    global next_waypoint, jumping
+    global next_waypoint, jumping, auto_jump
     if len(route) == 0: return
 
     next_waypoint = ""  # Next waypoint requires positive validation
@@ -281,6 +293,9 @@ def update_route_position():
     if current_system == route[-1]:
         route_pos_label.config(text="Destination reached")
         jumping = False
+        auto_jump = False
+        auto_jump_label.config(text="Route Complete")
+
         return
 
     for r in route:
@@ -298,6 +313,7 @@ root.title("Fleet Carrier Tools")
 root.iconbitmap('images/fc_icon.ico')
 
 do_refuel = tkinter.IntVar()
+DEBUG = tkinter.IntVar()
 
 frame = ttk.Frame(root, padding=10)
 frame.grid()
@@ -363,7 +379,14 @@ ttk.Label(frame,
     column=0, row=row, columnspan=5, sticky="w")
 
 row += 1
-ttk.Button(frame, text="Quit", command=root.destroy).grid(column=0, row=row)
+
+ttk.Label(frame, text="Debug Log?").grid(column=0, row=row, sticky="e")
+ttk.Checkbutton(frame, variable=DEBUG).grid(column=1, row=row, sticky="w")
+
+auto_jump_label = ttk.Label(frame, text="")
+auto_jump_label.grid(column=2, row=row, sticky="ew", columnspan=2)
+
+ttk.Button(frame, text="Quit", command=root.destroy).grid(column=4, row=row)
 
 
 def cool_down_complete():
@@ -389,7 +412,8 @@ def check_newer_log():
     newest = get_latest_log_file()
     if log != newest:
         ed_log.close()
-        print("Opening newer E:D log: ", log)
+        log = newest
+        if DEBUG.get() == 1: print("Opening newer E:D log: ", log)
         ed_log = open(log, 'r')
     root.after(10000, check_newer_log)
 
@@ -401,14 +425,14 @@ def process_log():
     curr_sys = ''
     for line in lines:
         line = line.strip()
-        print(line)
+        if _DEBUG: print(line)
         if line.count('StarSystem') > 0:
             curr_sys = line
         if line.count('Odyssey') > 0:
             ody = get_value_from_log_line(line, 'Odyssey')
             if ody == "true":
                 is_odyssey = True
-                print("We're in Odyssey")
+                if _DEBUG: print("We're in Odyssey")
         if line.count('CarrierJumpRequest') > 0:
             dest = get_value_from_log_line(line, 'SystemName')
             if dest == next_waypoint:
@@ -435,7 +459,7 @@ def process_log():
 # Set a status message
 def set_status(msg=''):
     status.config(text=msg)
-    if DEBUG:
+    if DEBUG.get() == 1:
         print(msg)
     root.update_idletasks()
 
@@ -456,6 +480,7 @@ def check_keys():
     if kb.is_pressed('ctrl+f9'):
         set_status("Enable auto jump")
         auto_jump = True
+        auto_jump_label.config(text="Auto Jump Enabled")
         root.after(100, schedule_jump)
         root.after(1000, check_keys)
         return
@@ -468,6 +493,8 @@ def check_keys():
     if kb.is_pressed('ctrl+f10'):
         set_status("Auto jump disabled")
         auto_jump = False
+        auto_jump_label.config(text="")
+
     root.after(20, check_keys)
 
 
@@ -475,9 +502,11 @@ def check_keys():
 settings = usersettings.Settings('com.ed.fcmacros')
 settings.add_setting("route_file", str, default="")
 settings.add_setting("refuel", int, default=1)
+settings.add_setting("debug", int, default=0)
 
 settings.load_settings()
 do_refuel.set(settings.refuel)
+DEBUG.set(settings.debug)
 
 
 def check_settings():
@@ -490,13 +519,14 @@ def check_settings():
         settings.route_file = route_file
 
     settings.refuel = do_refuel.get()
+    settings.debug = DEBUG.get()
     settings.save_settings()
 
     root.after(1000, check_settings)
 
 
 log = get_latest_log_file()
-print("Opening E:D log: ", log)
+if DEBUG.get() == 1: print("Opening E:D log: ", log)
 ed_log = open(log, 'r')
 check_newer_log()  # Start checking for log rotation
 
