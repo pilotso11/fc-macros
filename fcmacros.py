@@ -13,9 +13,16 @@ import glob
 import getpass
 import os
 import usersettings
-import PIL
-import cv2
 from keymaps import *
+import sys
+
+
+VERSION = "0.1.1"
+_DEBUG = False
+BUNDLED = False
+if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    print('running in a PyInstaller bundle')
+    BUNDLED = True
 
 
 current_system = ''
@@ -27,7 +34,6 @@ route = []
 next_waypoint = ''
 route_file = ""
 is_odyssey = False
-_DEBUG = False
 
 carrier_services_set = ['images/carrier_services.png',  # cutter
                         'images/carrier_services2.png',  # dolphin
@@ -311,22 +317,11 @@ def update_route_position():
     route_pos_label.config(text="First waypoint is {}".format(route[0]))
 
 
-def dark_style(root):
-    ''' Return a dark style to the window'''
-
-    style = ttk.Style(root)
-    root.tk.call('source', 'azure dark/azure dark.tcl')
-    style.theme_use('azure')
-    style.configure("Accentbutton", foreground='white')
-    style.configure("Togglebutton", foreground='white')
-    return style
-
-
-def dark_style2(root):
-    style = ttk.Style(root)
-    root.tk.call('source', 'awthemes-10.4.0/awdark.tcl')
-    style.theme_use('awdark')
-    return style
+def dark_style2(tk_root):
+    _style = ttk.Style(root)
+    tk_root.tk.call('source', 'awthemes-10.4.0/awdark.tcl')
+    _style.theme_use('awdark')
+    return _style
 
 
 # Setup UI
@@ -398,9 +393,11 @@ status = ttk.Label(frame, text="")
 status.grid(column=0, row=row, columnspan=5, sticky="w")
 row += 1
 
-
-ttk.Label(frame, text="Debug Log?").grid(column=0, row=row, sticky="e")
-ttk.Checkbutton(frame, variable=DEBUG).grid(column=1, row=row, sticky="w")
+if not BUNDLED:
+    ttk.Label(frame, text="Debug Log?").grid(column=0, row=row, sticky="e")
+    ttk.Checkbutton(frame, variable=DEBUG).grid(column=1, row=row, sticky="w")
+else:
+    ttk.Label(frame, text="Version " + VERSION).grid(column=0, row=row, sticky="e")
 
 auto_jump_label = ttk.Label(frame, text="")
 auto_jump_label.grid(column=2, row=row, sticky="ew", columnspan=2)
