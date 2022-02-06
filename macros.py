@@ -1,4 +1,4 @@
-# fc-macros.py
+# macros.py
 # Elite Dangerous Fleet Carrier Macros - autopilot/auto jumper
 # Copyright (c) 2022 Seth Osher
 #
@@ -545,9 +545,17 @@ def check_settings():
 log = get_latest_log_file()
 if DEBUG.get() == 1: print("Opening E:D log: ", log)
 ed_log = open(log, 'r')
-check_newer_log()  # Start checking for log rotation
 
-process_log()  # start log processing
-check_settings()  # start monitoring settings
-check_keys()  # start key monitoring
-root.mainloop()  # run
+
+# Run the UI
+def run_ui():
+    check_newer_log()  # Start checking for log rotation
+    process_log()  # start log processing
+    check_settings()  # start monitoring settings
+    check_keys()  # start key monitoring
+    root.mainloop()  # run
+
+
+if __name__ == '__main__':
+    run_ui()
+
