@@ -6,6 +6,8 @@ block_cipher = None
 added_files = [
          ( 'images/*', 'images' ),
          ( 'awthemes-10.4.0/*', 'awthemes-10.4.0' ),
+         ( 'README.md', '.' ),
+         ( 'LICENSE', '.' ),
          ]
 
 a = Analysis(['fcmacros.py'],

@@ -10,17 +10,19 @@ There are 3 primary macros:
 Route files are in CSV format from the spansh router.  Only the first column matres and it must be titled 
 "System Name".  https://www.spansh.co.uk/fleet-carrier
 
+![screenshot](images/screenshot.png)
 
 ------
 
 Currently, this plugin uses default keybindings and mouse for input.  The mouse is used to navigate the galmap.
 Because it uses the keyboard and mouse, it is unlikely to work with a joystick or HOTAS enabled.
 
-Note: See _keymaps.py_ to edit the keboard mappings.
+Note: See _keymaps.py_ to edit the keboard mappings.  (Only in source coude version.)
 
 It is also unlikely work with custom HUD colors as it uses image
 matching to verify its screen navigation.  If the macro cannot find the expected 
-ative user input it will abort for safety.
+ative
+user input it will abort for safety.
 
 Because the HUD sizes are different on some ships, this may cause issues.  
 In particular the size of the "Carrier Services" UI button varies.
@@ -40,11 +42,15 @@ setting up a jump to minimize the carrier mass.
 
 How to install.
 
-fc-macros requires the following python addins:
+Option 1:
+* Download a release zip file
+* Extract
+* Run fcmacros.exe
 
+Option 2:
+* Download the source
 * pip install keyboard pyautogui pillow opencv-python usersettings 
-
-To run, simply launch fc-macros.py.
+* python fcmacros.py
 
 -----------------
 
