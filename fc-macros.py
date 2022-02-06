@@ -292,6 +292,7 @@ def update_route_position():
     n = 0
     if current_system == route[-1]:
         route_pos_label.config(text="Destination reached")
+        progress.set(100)
         jumping = False
         auto_jump = False
         auto_jump_label.config(text="Route Complete")
@@ -302,29 +303,48 @@ def update_route_position():
         if r == current_system:
             next_waypoint = route[n + 1]
             route_pos_label.config(text="At waypoint {}, next is {}".format(n, next_waypoint))
+            progress.set(100 * n // len(route))
             return
         n += 1
     route_pos_label.config(text="First waypoint is {}".format(route[0]))
 
 
+def dark_style(root):
+    ''' Return a dark style to the window'''
+
+    style = ttk.Style(root)
+    root.tk.call('source', 'azure dark/azure dark.tcl')
+    style.theme_use('azure')
+    style.configure("Accentbutton", foreground='white')
+    style.configure("Togglebutton", foreground='white')
+    return style
+
+
+def dark_style2(root):
+    style = ttk.Style(root)
+    root.tk.call('source', 'awthemes-10.4.0/awdark.tcl')
+    style.theme_use('awdark')
+    return style
+
+
 # Setup UI
 root = Tk()
-root.title("Fleet Carrier Tools")
+root.title("Fleet Carrier Macros")
 root.iconbitmap('images/fc_icon.ico')
+style = dark_style2(root)
 
 do_refuel = tkinter.IntVar()
 DEBUG = tkinter.IntVar()
+progress = tkinter.IntVar()
 
 frame = ttk.Frame(root, padding=10)
 frame.grid()
 row = 0
-ttk.Label(frame, text="Fleet Carrier Tools").grid(column=0, row=row)
-row += 1
 
 ttk.Label(frame, text="Refuel Carrier:").grid(column=0, row=row, sticky="e")
 ttk.Label(frame, text="Ctrl+F11").grid(column=1, row=row, sticky="w")
 
-ttk.Label(frame, text="Empty card hold:").grid(column=2, row=row, sticky="e")
+ttk.Label(frame, text="Empty cargo hold:").grid(column=2, row=row, sticky="e")
 ttk.Label(frame, text="Ctrl+F5").grid(column=3, row=row, sticky="w")
 row += 1
 
@@ -359,12 +379,14 @@ row += 1
 
 ttk.Label(frame, text="Destination:").grid(column=0, row=row, sticky="e")
 route_len_label = ttk.Label(frame, text="Unknown")
-route_len_label.grid(column=1, row=row, sticky="w")
+route_len_label.grid(column=1, row=row, sticky="w", columnspan=3)
 row += 1
 
 ttk.Label(frame, text="Progress:").grid(column=0, row=row, sticky="e")
 route_pos_label = ttk.Label(frame, text="Unknown")
-route_pos_label.grid(column=1, row=row, sticky="w")
+route_pos_label.grid(column=1, row=row, sticky="w", columnspan=3)
+row += 1
+ttk.Progressbar(frame, variable=progress, length=200).grid(column=1, row=row, columnspan=2, sticky="ew")
 row += 1
 
 ttk.Separator(frame, orient="horizontal").grid(column=0, row=row, columnspan=5, sticky="ew")
@@ -374,11 +396,6 @@ status = ttk.Label(frame, text="")
 status.grid(column=0, row=row, columnspan=5, sticky="w")
 row += 1
 
-ttk.Label(frame,
-          text="                                                                                               ").grid(
-    column=0, row=row, columnspan=5, sticky="w")
-
-row += 1
 
 ttk.Label(frame, text="Debug Log?").grid(column=0, row=row, sticky="e")
 ttk.Checkbutton(frame, variable=DEBUG).grid(column=1, row=row, sticky="w")
