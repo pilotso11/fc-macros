@@ -461,11 +461,10 @@ status = ttk.Label(frame, text="")
 status.grid(column=0, row=row, columnspan=5, sticky="w")
 row += 1
 
-if not BUNDLED:
-    ttk.Label(frame, text="Debug Log?").grid(column=0, row=row, sticky="e")
-    ttk.Checkbutton(frame, variable=DEBUG).grid(column=1, row=row, sticky="w")
-else:
-    ttk.Label(frame, text="Version " + VERSION).grid(column=0, row=row, sticky="e")
+ttk.Label(frame, text="Debug Log?").grid(column=0, row=row, sticky="e")
+ttk.Checkbutton(frame, variable=DEBUG).grid(column=1, row=row, sticky="w")
+row += 1
+ttk.Label(frame, text="Version " + VERSION).grid(column=0, row=row, sticky="w")
 
 auto_jump_label = ttk.Label(frame, text="")
 auto_jump_label.grid(column=2, row=row, sticky="ew", columnspan=2)
