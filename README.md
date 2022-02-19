@@ -55,4 +55,7 @@ Option 2:
 -----------------
 
 Copyright (c) 2022 Seth Osher. All Rights Reseved.
-Released under the MIT license. 
+Released under the MIT license.
+
+------------------
+Tags: Elite Dangerous Fleet Carrier autopilot auto jumper macros
