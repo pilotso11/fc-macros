@@ -34,13 +34,17 @@ It has been tested on the most likely to be used ships:
 * Type 9
 * Beluga
 
+You can add your own image if needed for "Carrier Services" and "Carrier Management". 
+To do so, take a screenshot, clip out just the button (you can see the existing images in the images/ folder).
+Save this image in the images/ folder and make sure it is named "carrier_services*.png" or "carrier_management*.png".
+
 If you use the refuel option, make sure your ship has enough room for a full jumps worth of Tritium, 
 as much as 150 Tons if your carrier is fully loaded.   This option will load the carrier and the ship before 
 setting up a jump to minimize the carrier mass.
 
 ---------------
 
-How to install.
+##How to install.
 
 Option 1:
 * Download a release zip file
@@ -49,8 +53,30 @@ Option 1:
 
 Option 2:
 * Download the source
-* pip install keyboard pyautogui pillow opencv-python usersettings 
+* pip install keyboard pyautogui pillow opencv-python usersettings pywin32
+  * Or run "setup.cmd"
 * python fcmacros.py
+
+-----------------
+
+##Troubleshooting
+
+Summary of actions are written to "fcmacros.log" in the working directory.
+If you are experiencing issues, enable debug logging.  The log file will contain
+details of every step the macro is taking - what keypresses it is making, 
+the images it is searching for on the screen etc.   Hopefully there will be enough
+information to trouble shoot.
+
+Likely causes:
+* The image matching is screen resolution and colour specific.  If you're not running E:D at 1080p the images may not match.
+* Custom HUD colours will break the image matching.
+* Non-standard keybindings can also be a problem.
+
+If image matching is an issue, you can try replacing the images with your own cropped screenshots.
+
+If you have the source code version you can edit the keybindings in "keymaps.py".
+
+
 
 -----------------
 

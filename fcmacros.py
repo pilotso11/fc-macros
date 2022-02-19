@@ -17,6 +17,7 @@ from keymaps import *
 import logging
 import logging.handlers
 import sys
+import win32gui
 
 
 VERSION = "0.1.2"
@@ -54,6 +55,8 @@ is_odyssey = False
 
 # Use all available carrier_services images
 carrier_services_set = glob.glob("images/carrier_services*.png")
+carrier_management_set = glob.glob("images/carrier_management*.png")
+logging.info(f"Loaded {len(carrier_management_set)} carrier management images")
 logging.info(f"Loaded {len(carrier_services_set)} carrier services images")
 
 
@@ -63,6 +66,17 @@ def get_latest_log_file():
         f"C:\\Users\\{getpass.getuser()}\\Saved Games\\Frontier Developments\\Elite Dangerous\\Journal.*")
     return max(list_of_files, key=os.path.getmtime)
 
+
+def get_current_focus():
+    logging.debug("Checking window focus before running macro")
+    win = win32gui.GetForegroundWindow()
+    title = win32gui.GetWindowText(win)
+    if title != "Elite - Dangerous (CLIENT)":
+        logging.warning(f"Current window is '{title}' and not 'Elite - Dangerous' abort macro")
+        set_status("Elite - Dangerous does not have the focus, aborting")
+        return False
+    logging.debug("Elite - Dangerous has the focus, macro proceeding")
+    return True
 
 # Load and parse the route.csv
 def load_route(route_file_name):
@@ -137,13 +151,16 @@ def press_and_find(key=ED_UI_LEFT, image='images/tritium.png', max_tries=10, con
 
 def press_and_find_set(key=ED_UI_LEFT, images=[], max_tries=10, confidence=0.75):
     cnt = 0
+    logging.debug(f"Looking for one of {images}")
     while True:
         for i in images:
             if pyautogui.locateOnScreen(i, confidence=confidence) is not None:
+                logging.debug(f"Found {i}")
                 return True
         press(key)
         cnt += 1
         if cnt > max_tries:
+            logging.debug(f"No image found after {max_tries} attempts")
             set_status('Macro failed')
             return False
 
@@ -159,7 +176,7 @@ def mouse_click_at(x, y, pause=0.25, click_duration=0.25):
 # Move back to the carrier main screen after a jump
 def set_to_carrier():
     sleep(5)
-    press(ED_RIGHT_WINDOW)
+    if not press_and_find_set(ED_RIGHT_WINDOW, ["images/inventory.png", "images/inventory_unselected.png"]): return False
     sleep(1)
     if not press_and_find_set(ED_BACK, carrier_services_set): return False
     press(ED_UI_SELECT)
@@ -173,7 +190,19 @@ def schedule_jump():
 # Macro to schedule a jump
 def find_system_and_jump():
     global jumping, jump_one
-    if len(next_waypoint) < 3 or not (auto_jump or jump_one): return False
+
+    # Check E:D still has the focus
+    if not get_current_focus(): return False
+
+    # Get next waypoint and check I'm still enabled for auto jump
+    if len(next_waypoint) < 3:
+        set_status("No next waypoint")
+        return False
+
+    if not (auto_jump or jump_one):
+        logging.warning("Jump requested but no jump is enabled")
+        set_status("Jump is disabled, aborting")
+        return False
 
     if do_refuel.get() == 1:
         if not load_tritium(): return False
@@ -188,7 +217,7 @@ def find_system_and_jump():
     if not press_and_find_set(ED_BACK, carrier_services_set): return False
     press(ED_UI_SELECT)
     if not press_and_find(ED_UI_DOWN, 'images/tritium_depot.png'): return False
-    if not press_and_find(ED_UI_RIGHT, 'images/carrier_management.png'): return False
+    if not press_and_find_set(ED_UI_RIGHT, carrier_management_set): return False
     press(ED_UI_SELECT)
     sleep(2)
     if not press_and_find(ED_UI_DOWN, 'images/navigation.png'): return False
@@ -225,6 +254,7 @@ def find_system_and_jump():
 # Callback to refuel the ship, the carrier and then the ship
 # to optimise carrier mass and save up to 1 ton of fuel per jump
 def refuel():
+    if not get_current_focus(): return
     set_status('Refueling')
     sleep(1)
     if not load_tritium(): return
@@ -234,6 +264,9 @@ def refuel():
 
 # Refill ship with tritium
 def load_tritium():
+    # Check E:D still has the focus
+    if not get_current_focus(): return False
+
     set_status('Filling ship with tritium')
     if not press_and_find_set(ED_BACK, carrier_services_set): return False
     press(ED_RIGHT_WINDOW, 0.5)
@@ -283,6 +316,9 @@ def donate_tritium():
 
 
 def empty_cargo():
+    # Check focus is E:D
+    if not get_current_focus(): return False
+
     set_status('Emptying your cargo hold')
     if not press_and_find_set(ED_BACK, carrier_services_set): return False
     press(ED_RIGHT_WINDOW, 0.5)
@@ -335,6 +371,7 @@ def update_route_position():
             return
         n += 1
     route_pos_label.config(text="First waypoint is {}".format(route[0]))
+    next_waypoint = route[0]
 
 
 def dark_style2(tk_root):
@@ -352,6 +389,17 @@ style = dark_style2(root)
 
 do_refuel = tkinter.IntVar()
 DEBUG = tkinter.IntVar()
+
+
+def on_debug_change(*args):
+    if DEBUG.get() == 1:
+        logging.info("Debug enabled")
+    else:
+        logging.info("Debug disabled")
+    check_settings()
+
+
+DEBUG.trace_add("write", on_debug_change)
 progress = tkinter.IntVar()
 
 frame = ttk.Frame(root, padding=10)
