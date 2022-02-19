@@ -14,16 +14,33 @@ import getpass
 import os
 import usersettings
 from keymaps import *
+import logging
+import logging.handlers
 import sys
 
 
-VERSION = "0.1.1"
-_DEBUG = False
+VERSION = "0.1.2"
 BUNDLED = False
-if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-    print('running in a PyInstaller bundle')
-    BUNDLED = True
+LOGFILE = "fcmacros.log"
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+handler = logging.handlers.RotatingFileHandler(
+    LOGFILE, maxBytes=(1048576*5), backupCount=10
+)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
+if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    BUNDLED = True
+else:
+    consoleHandler = logging.StreamHandler()
+    consoleHandler.setFormatter(formatter)
+    logger.addHandler(consoleHandler)
+
+logging.info(f"Starting fcmacros.py version: {VERSION}")
+if BUNDLED: logging.info('Running in a PyInstaller bundle')
+else: logging.info('Running as a console application')
 
 current_system = ''
 jumping = False
@@ -35,14 +52,9 @@ next_waypoint = ''
 route_file = ""
 is_odyssey = False
 
-carrier_services_set = ['images/carrier_services.png',  # cutter
-                        'images/carrier_services2.png',  # dolphin
-                        'images/carrier_services3.png',  # type 9
-                        'images/carrier_services4.png',  # mamba
-                        'images/carrier_services5.png',  # conda
-                        'images/carrier_services6.png',  # beluga
-                        'images/carrier_services7.png',  # python
-                        ]
+# Use all available carrier_services images
+carrier_services_set = glob.glob("images/carrier_services*.png")
+logging.info(f"Loaded {len(carrier_services_set)} carrier services images")
 
 
 # Find most recent E:D log file
@@ -77,7 +89,8 @@ def load_route(route_file_name):
                     system = parts[0].strip('"')
                     route.append(system)
                 cnt += 1
-            except (RuntimeError, UnicodeDecodeError):
+            except (RuntimeError, UnicodeDecodeError) as err:
+                logging.warning(f"Exception loading route file {route_file_name}: {err}")
                 set_status("Invalid route file, first column must be System Name")
                 route_file = ""
 
@@ -96,7 +109,7 @@ def press(key, delay=0.1, down_time=0.2):
         out = "Press: space"
     else:
         out = "Press: " + key
-    if DEBUG.get() == 1: print(out)
+    logging.debug(out)
     kb.press(key)
     sleep(down_time)
     kb.release(key)
@@ -107,14 +120,18 @@ def press(key, delay=0.1, down_time=0.2):
 # if not, press the key specified, true this up to max_trues times,
 # if max_tries is exceeded return False
 # confidence is the confidence interval on the match
-def press_and_find(key=ED_UI_LEFT, image='images/tritium.png', max_tries=10, confidence=0.75):
+def press_and_find(key=ED_UI_LEFT, image='images/tritium.png', max_tries=10, confidence=0.75, do_log=True):
     cnt = 0
+    if do_log: logging.debug(f"Looking for: {image}")
     while pyautogui.locateOnScreen(image, confidence=confidence) is None:
+        if do_log: logging.debug(f"{image} not found")
         press(key)
         cnt += 1
         if cnt > max_tries:
+            logging.warning(f"Unable to find {image} after {max_tries}")
             set_status('Macro failed')
             return False
+    if do_log: logging.debug(f"{image} found")
     return True
 
 
@@ -229,8 +246,11 @@ def load_tritium():
 
     # hold down the ED_UI_LEFT key until max capacity is reached
     kb.press(ED_UI_LEFT)
+    logging.debug(f"Press and hold {ED_UI_LEFT}")
     while pyautogui.locateOnScreen('images/max_capacity.png', confidence=0.75) is None:
         sleep(0.5)
+    logging.debug(f"images/max_capacity.png found")
+    logging.debug(f"Release {ED_UI_LEFT}")
     kb.release(ED_UI_LEFT)
 
     if not press_and_find(ED_UI_DOWN, 'images/cancel.png'): return False
@@ -429,45 +449,50 @@ def check_newer_log():
     if log != newest:
         ed_log.close()
         log = newest
-        if DEBUG.get() == 1: print("Opening newer E:D log: ", log)
+        logging.info(f"Opening newer E:D log: {log}")
         ed_log = open(log, 'r')
     root.after(10000, check_newer_log)
 
 
 def process_log():
     global current_system, jumping, cool_down, is_odyssey
-    lines = ed_log.readlines()
-    # print("Got ", len(lines), "lines from E:D log")
-    curr_sys = ''
-    for line in lines:
-        line = line.strip()
-        if _DEBUG: print(line)
-        if line.count('StarSystem') > 0:
-            curr_sys = line
-        if line.count('Odyssey') > 0:
-            ody = get_value_from_log_line(line, 'Odyssey')
-            if ody == "true":
-                is_odyssey = True
-                if _DEBUG: print("We're in Odyssey")
-        if line.count('CarrierJumpRequest') > 0:
-            dest = get_value_from_log_line(line, 'SystemName')
-            if dest == next_waypoint:
-                set_status("Jump to {} confirmed".format(dest))
+    try:
+        lines = ed_log.readlines()
+        if len(lines) > 0:
+            logging.debug(f"Got {len(lines)} lines from E:D log")
+        curr_sys = ''
+        for line in lines:
+            line = line.strip()
+            #logging.debug(line)
+            if line.count('StarSystem') > 0:
+                curr_sys = line
+            if line.count('Odyssey') > 0:
+                ody = get_value_from_log_line(line, 'Odyssey')
+                if ody == "true":
+                    is_odyssey = True
+                    logging.info("We're in Odyssey")
+            if line.count('CarrierJumpRequest') > 0:
+                dest = get_value_from_log_line(line, 'SystemName')
+                if dest == next_waypoint:
+                    set_status("Jump to {} confirmed".format(dest))
 
-    if curr_sys > '':
-        new_system = curr_sys.split('"StarSystem":"')[1].split('"')[0]
-        if current_system != new_system:
-            current_system = new_system
-            if jumping:
-                jumping = False
-                cool_down = True
-                root.after(1000 * 210, cool_down_complete)
-                set_to_carrier()
+        if curr_sys > '':
+            new_system = curr_sys.split('"StarSystem":"')[1].split('"')[0]
+            if current_system != new_system:
+                current_system = new_system
+                if jumping:
+                    jumping = False
+                    cool_down = True
+                    root.after(1000 * 210, cool_down_complete)
+                    set_to_carrier()
 
-            set_status("Current system: " + current_system)
-            system_label.config(text=current_system)
-            update_route_position()
-            root.update_idletasks()
+                set_status("Current system: " + current_system)
+                system_label.config(text=current_system)
+                update_route_position()
+                root.update_idletasks()
+
+    except (UnicodeDecodeError, ) as err:
+        logging.warning(f"Exception processing log file: {err}")
 
     root.after(1000, process_log)
 
@@ -475,8 +500,7 @@ def process_log():
 # Set a status message
 def set_status(msg=''):
     status.config(text=msg)
-    if DEBUG.get() == 1:
-        print(msg)
+    logging.info(msg)
     root.update_idletasks()
 
 
@@ -520,9 +544,18 @@ settings.add_setting("route_file", str, default="")
 settings.add_setting("refuel", int, default=1)
 settings.add_setting("debug", int, default=0)
 
+
+def set_debug_level():
+    if settings.debug:
+        logger.setLevel(logging.DEBUG)
+    else:
+        logger.setLevel(logging.INFO)
+
+
 settings.load_settings()
 do_refuel.set(settings.refuel)
 DEBUG.set(settings.debug)
+set_debug_level()
 
 
 def check_settings():
@@ -536,13 +569,14 @@ def check_settings():
 
     settings.refuel = do_refuel.get()
     settings.debug = DEBUG.get()
+    set_debug_level()
     settings.save_settings()
 
     root.after(1000, check_settings)
 
 
 log = get_latest_log_file()
-if DEBUG.get() == 1: print("Opening E:D log: ", log)
+logging.info(f"Opening E:D log: {log}")
 ed_log = open(log, 'r')
 
 
