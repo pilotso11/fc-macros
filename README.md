@@ -44,7 +44,7 @@ setting up a jump to minimize the carrier mass.
 
 ---------------
 
-##How to install.
+# Installation
 
 Option 1:
 * Download a release zip file
@@ -59,7 +59,7 @@ Option 2:
 
 -----------------
 
-##Troubleshooting
+# Troubleshooting
 
 Summary of actions are written to "fcmacros.log" in the working directory.
 If you are experiencing issues, enable debug logging.  The log file will contain
@@ -71,6 +71,9 @@ Likely causes:
 * The image matching is screen resolution and colour specific.  If you're not running E:D at 1080p the images may not match.
 * Custom HUD colours will break the image matching.
 * Non-standard keybindings can also be a problem.
+* Try running in windowed mode if you are in full-screen mode.  Alt-Enter to switch modes.
+* Try using the default UI brightness.
+* You can also try reducing the image matching confidence from the default value of 75.
 
 If image matching is an issue, you can try replacing the images with your own cropped screenshots.
 

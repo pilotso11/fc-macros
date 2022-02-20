@@ -20,7 +20,7 @@ import sys
 import win32gui
 
 
-VERSION = "0.1.3"
+VERSION = "0.1.4"
 BUNDLED = False
 LOGFILE = "fcmacros.log"
 logger = logging.getLogger()
@@ -43,6 +43,15 @@ logging.info(f"Starting fcmacros.py version: {VERSION}")
 if BUNDLED: logging.info('Running in a PyInstaller bundle')
 else: logging.info('Running as a console application')
 
+# initialize settings
+settings = usersettings.Settings('com.ed.fcmacros')
+settings.add_setting("route_file", str, default="")
+settings.add_setting("refuel", int, default=1)
+settings.add_setting("debug", int, default=0)
+settings.add_setting("grayscale", int, default=0)
+settings.add_setting("confidence", int, default=75)
+
+# Global state
 current_system = ''
 jumping = False
 cool_down = False
@@ -52,8 +61,6 @@ route = []
 next_waypoint = ''
 route_file = ""
 is_odyssey = False
-
-# Use all available carrier_services images
 
 
 # Find most recent E:D log file
@@ -131,11 +138,7 @@ def press(key, delay=0.1, down_time=0.2):
 images_dict = {}
 
 
-# look for the image on screen , if found, return True
-# if not, press the key specified, true this up to max_trues times,
-# if max_tries is exceeded return False
-# confidence is the confidence interval on the match
-def press_and_find(key=ED_UI_LEFT, image='tritium', max_tries=10, confidence=0.75, grayscale=False, do_log=True):
+def get_matching_images(image):
     if image in images_dict:
         image_set = images_dict[image]
     else:
@@ -143,30 +146,42 @@ def press_and_find(key=ED_UI_LEFT, image='tritium', max_tries=10, confidence=0.7
         logging.info(f"Found { len(image_set)} images for {image}: {image_set}")
         images_dict[image] = image_set
 
+    return image_set
+
+# look for the image on screen , if found, return True
+# if not, press the key specified, true this up to max_trues times,
+# if max_tries is exceeded return False
+# confidence is the confidence interval on the match
+def press_and_find(key=ED_UI_LEFT, image='tritium', max_tries=10, do_log=True):
+    image_set = get_matching_images(image)
+    grayscale = settings.grayscale == 1
+    confidence = settings.confidence / 100.0
     return press_and_find_set(key, image_set, max_tries, confidence, grayscale, do_log)
 
 
 # Locate an image(set) on the screen, return its found position
 def locate_on_screen(image='tritium', confidence=0.75, grayscale=False, do_log=True):
-    if image in images_dict:
-        image_set = images_dict[image]
-    else:
-        image_set = glob.glob("images/" + image + "-*.png")
-        logging.info(f"Found { len(image_set)} images for {image}: {image_set}")
-        images_dict[image] = image_set
+    image_set = get_matching_images(image)
 
+    grayscale = settings.grayscale == 1
+    confidence = settings.confidence / 100.0
     return locate_on_screen_set(image_set, confidence, grayscale, do_log)
 
 
-def locate_on_screen_set(images=[], confidence=0.75, grayscale=False, do_log=True):
+def locate_on_screen_set(images=None, confidence=0.75, grayscale=False, do_log=True):
+    if images is None:
+        images = []
     for i in images:
         pos = pyautogui.locateOnScreen(i, confidence=confidence, grayscale=grayscale)
         if pos is not None:
+            if do_log: logging.debug(f"Found {i}")
             return pos
     return None
 
 
-def press_and_find_set(key=ED_UI_LEFT, images=[], max_tries=10, confidence=0.75, grayscale=False, do_log=True):
+def press_and_find_set(key=ED_UI_LEFT, images=None, max_tries=10, confidence=0.75, grayscale=False, do_log=True):
+    if images is None:
+        images = []
     cnt = 0
     if do_log: logging.debug(f"Looking for one of {images}")
     while True:
@@ -244,7 +259,7 @@ def find_system_and_jump():
     press(ED_UI_SELECT)
     sleep(3)
 
-    pos = locate_on_screen('search_the_galaxy', confidence=0.75)
+    pos = locate_on_screen('search_the_galaxy')
     if pos is None:
         set_status("Unable to find search")
         return False
@@ -254,7 +269,7 @@ def find_system_and_jump():
     sleep(1)
     mouse_click_at(x, y + pos.height)
     sleep(2)
-    pos = locate_on_screen('set_carrier_destination', confidence=0.75)
+    pos = locate_on_screen('set_carrier_destination')
     if pos is None:
         set_status("Unable to find set carrier destination")
         return False
@@ -297,7 +312,7 @@ def load_tritium():
     # hold down the ED_UI_LEFT key until max capacity is reached
     kb.press(ED_UI_LEFT)
     logging.debug(f"Press and hold {ED_UI_LEFT}")
-    while locate_on_screen('max_capacity', confidence=0.75) is None:
+    while locate_on_screen('max_capacity') is None:
         sleep(0.5)
     logging.debug(f"max_capacity found")
     logging.debug(f"Release {ED_UI_LEFT}")
@@ -406,6 +421,9 @@ style = dark_style2(root)
 
 do_refuel = tkinter.IntVar()
 DEBUG = tkinter.IntVar()
+GRAYSCALE = tkinter.IntVar()
+CONFIDENCE = tkinter.StringVar()
+CONFIDENCE.set("75")
 
 
 def on_debug_change(*args):
@@ -417,6 +435,9 @@ def on_debug_change(*args):
 
 
 DEBUG.trace_add("write", on_debug_change)
+GRAYSCALE.trace_add("write", on_debug_change)
+CONFIDENCE.trace_add("write", on_debug_change)
+
 progress = tkinter.IntVar()
 
 frame = ttk.Frame(root, padding=10)
@@ -480,6 +501,11 @@ row += 1
 
 ttk.Label(frame, text="Debug Log?").grid(column=0, row=row, sticky="e")
 ttk.Checkbutton(frame, variable=DEBUG).grid(column=1, row=row, sticky="w")
+ttk.Label(frame, text="Image matching confidence?").grid(column=2, row=row, sticky="e")
+#ttk.Checkbutton(frame, variable=GRAYSCALE).grid(column=3, row=row, sticky="w")
+ttk.Spinbox(frame, from_=10, to=90, textvariable=CONFIDENCE).grid(column=3, row=row, sticky="e")
+
+
 row += 1
 ttk.Label(frame, text="Version " + VERSION).grid(column=0, row=row, sticky="w")
 
@@ -602,13 +628,6 @@ def check_keys():
     root.after(20, check_keys)
 
 
-# initialize settings
-settings = usersettings.Settings('com.ed.fcmacros')
-settings.add_setting("route_file", str, default="")
-settings.add_setting("refuel", int, default=1)
-settings.add_setting("debug", int, default=0)
-
-
 def set_debug_level():
     if settings.debug:
         logger.setLevel(logging.DEBUG)
@@ -620,6 +639,8 @@ settings.load_settings()
 do_refuel.set(settings.refuel)
 DEBUG.set(settings.debug)
 set_debug_level()
+GRAYSCALE.set(settings.grayscale)
+CONFIDENCE.set(settings.confidence)
 
 
 def check_settings():
@@ -634,6 +655,12 @@ def check_settings():
     settings.refuel = do_refuel.get()
     settings.debug = DEBUG.get()
     set_debug_level()
+    settings.grayscale = GRAYSCALE.get()
+    try:
+        settings.confidence = int(CONFIDENCE.get())
+    except ValueError:
+        pass
+
     settings.save_settings()
 
     root.after(1000, check_settings)
