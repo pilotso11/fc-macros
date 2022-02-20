@@ -497,7 +497,7 @@ def check_newer_log():
         ed_log.close()
         log = newest
         logging.info(f"Opening newer E:D log: {log}")
-        ed_log = open(log, 'r')
+        ed_log = open(log, 'r', encoding='utf-8')
     root.after(10000, check_newer_log)
 
 
