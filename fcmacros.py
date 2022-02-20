@@ -54,10 +54,6 @@ route_file = ""
 is_odyssey = False
 
 # Use all available carrier_services images
-carrier_services_set = glob.glob("images/carrier_services*.png")
-carrier_management_set = glob.glob("images/carrier_management*.png")
-logging.info(f"Loaded {len(carrier_management_set)} carrier management images")
-logging.info(f"Loaded {len(carrier_services_set)} carrier services images")
 
 
 # Find most recent E:D log file
@@ -77,6 +73,7 @@ def get_current_focus():
         return False
     logging.debug("Elite - Dangerous has the focus, macro proceeding")
     return True
+
 
 # Load and parse the route.csv
 def load_route(route_file_name):
@@ -130,32 +127,52 @@ def press(key, delay=0.1, down_time=0.2):
     sleep(delay)
 
 
+# Hold image list
+images_dict = {}
+
+
 # look for the image on screen , if found, return True
 # if not, press the key specified, true this up to max_trues times,
 # if max_tries is exceeded return False
 # confidence is the confidence interval on the match
-def press_and_find(key=ED_UI_LEFT, image='images/tritium.png', max_tries=10, confidence=0.75, do_log=True):
-    cnt = 0
-    if do_log: logging.debug(f"Looking for: {image}")
-    while pyautogui.locateOnScreen(image, confidence=confidence) is None:
-        if do_log: logging.debug(f"{image} not found")
-        press(key)
-        cnt += 1
-        if cnt > max_tries:
-            logging.warning(f"Unable to find {image} after {max_tries}")
-            set_status('Macro failed')
-            return False
-    if do_log: logging.debug(f"{image} found")
-    return True
+def press_and_find(key=ED_UI_LEFT, image='tritium', max_tries=10, confidence=0.75, grayscale=False, do_log=True):
+    if image in images_dict:
+        image_set = images_dict[image]
+    else:
+        image_set = glob.glob("images/" + image + "-*.png")
+        logging.info(f"Found { len(image_set)} images for {image}: {image_set}")
+        images_dict[image] = image_set
+
+    return press_and_find_set(key, image_set, max_tries, confidence, grayscale, do_log)
 
 
-def press_and_find_set(key=ED_UI_LEFT, images=[], max_tries=10, confidence=0.75):
+# Locate an image(set) on the screen, return its found position
+def locate_on_screen(image='tritium', confidence=0.75, grayscale=False, do_log=True):
+    if image in images_dict:
+        image_set = images_dict[image]
+    else:
+        image_set = glob.glob("images/" + image + "-*.png")
+        logging.info(f"Found { len(image_set)} images for {image}: {image_set}")
+        images_dict[image] = image_set
+
+    return locate_on_screen_set(image_set, confidence, grayscale, do_log)
+
+
+def locate_on_screen_set(images=[], confidence=0.75, grayscale=False, do_log=True):
+    for i in images:
+        pos = pyautogui.locateOnScreen(i, confidence=confidence, grayscale=grayscale)
+        if pos is not None:
+            return pos
+    return None
+
+
+def press_and_find_set(key=ED_UI_LEFT, images=[], max_tries=10, confidence=0.75, grayscale=False, do_log=True):
     cnt = 0
-    logging.debug(f"Looking for one of {images}")
+    if do_log: logging.debug(f"Looking for one of {images}")
     while True:
         for i in images:
-            if pyautogui.locateOnScreen(i, confidence=confidence) is not None:
-                logging.debug(f"Found {i}")
+            if pyautogui.locateOnScreen(i, confidence=confidence, grayscale=grayscale) is not None:
+                if do_log: logging.debug(f"Found {i}")
                 return True
         press(key)
         cnt += 1
@@ -176,9 +193,9 @@ def mouse_click_at(x, y, pause=0.25, click_duration=0.25):
 # Move back to the carrier main screen after a jump
 def set_to_carrier():
     sleep(5)
-    if not press_and_find_set(ED_RIGHT_WINDOW, ["images/inventory.png", "images/inventory_unselected.png"]): return False
+    if not ( press_and_find(ED_RIGHT_WINDOW, "inventory") or press_and_find(ED_RIGHT_WINDOW, "inventory_unselected") ): return False
     sleep(1)
-    if not press_and_find_set(ED_BACK, carrier_services_set): return False
+    if not press_and_find(ED_BACK, "carrier_services"): return False
     press(ED_UI_SELECT)
 
 
@@ -214,20 +231,20 @@ def find_system_and_jump():
     set_status('Finding next waypoint')
 
     # Back to main menu
-    if not press_and_find_set(ED_BACK, carrier_services_set): return False
+    if not press_and_find(ED_BACK, "carrier_services"): return False
     press(ED_UI_SELECT)
-    if not press_and_find(ED_UI_DOWN, 'images/tritium_depot.png'): return False
-    if not press_and_find_set(ED_UI_RIGHT, carrier_management_set): return False
+    if not press_and_find(ED_UI_DOWN, 'tritium_depot'): return False
+    if not press_and_find(ED_UI_RIGHT, "carrier_management"): return False
     press(ED_UI_SELECT)
     sleep(2)
-    if not press_and_find(ED_UI_DOWN, 'images/navigation.png'): return False
+    if not press_and_find(ED_UI_DOWN, 'navigation'): return False
     press(ED_UI_SELECT)
     sleep(0.5)
-    if not press_and_find(ED_UI_DOWN, 'images/open_galmap.png'): return False
+    if not press_and_find(ED_UI_DOWN, 'open_galmap'): return False
     press(ED_UI_SELECT)
     sleep(3)
 
-    pos = pyautogui.locateOnScreen('images/search_the_galaxy.png', confidence=0.75)
+    pos = locate_on_screen('search_the_galaxy', confidence=0.75)
     if pos is None:
         set_status("Unable to find search")
         return False
@@ -237,7 +254,7 @@ def find_system_and_jump():
     sleep(1)
     mouse_click_at(x, y + pos.height)
     sleep(2)
-    pos = pyautogui.locateOnScreen('images/set_carrier_destination.png', confidence=0.75)
+    pos = locate_on_screen('set_carrier_destination', confidence=0.75)
     if pos is None:
         set_status("Unable to find set carrier destination")
         return False
@@ -246,7 +263,7 @@ def find_system_and_jump():
     set_status("Jump set for {}".format(next_waypoint))
     jumping = True
 
-    if not press_and_find_set(ED_BACK, carrier_services_set): return False
+    if not press_and_find(ED_BACK, "carrier_services"): return False
     press(ED_UI_SELECT)
     return True
 
@@ -268,29 +285,29 @@ def load_tritium():
     if not get_current_focus(): return False
 
     set_status('Filling ship with tritium')
-    if not press_and_find_set(ED_BACK, carrier_services_set): return False
+    if not press_and_find(ED_BACK, "carrier_services"): return False
     press(ED_RIGHT_WINDOW, 0.5)
-    if not press_and_find('e', 'images/inventory.png'): return False
+    if not press_and_find('e', 'inventory'): return False
     press(ED_UI_RIGHT)
     press(ED_UI_UP)
-    if not press_and_find(ED_UI_RIGHT, 'images/transfer.png'): return False
+    if not press_and_find(ED_UI_RIGHT, 'transfer'): return False
     press(ED_UI_SELECT)
-    if not press_and_find(ED_UI_UP, 'images/tritium.png'): return False
+    if not press_and_find(ED_UI_UP, 'tritium'): return False
 
     # hold down the ED_UI_LEFT key until max capacity is reached
     kb.press(ED_UI_LEFT)
     logging.debug(f"Press and hold {ED_UI_LEFT}")
-    while pyautogui.locateOnScreen('images/max_capacity.png', confidence=0.75) is None:
+    while locate_on_screen('max_capacity', confidence=0.75) is None:
         sleep(0.5)
-    logging.debug(f"images/max_capacity.png found")
+    logging.debug(f"max_capacity found")
     logging.debug(f"Release {ED_UI_LEFT}")
     kb.release(ED_UI_LEFT)
 
-    if not press_and_find(ED_UI_DOWN, 'images/cancel.png'): return False
+    if not press_and_find(ED_UI_DOWN, 'cancel'): return False
     press(ED_UI_RIGHT)
     press(ED_UI_SELECT)
     set_status('tritium loaded')
-    if not press_and_find_set(ED_BACK, carrier_services_set): return False
+    if not press_and_find(ED_BACK, "carrier_services"): return False
 
     return True
 
@@ -298,19 +315,19 @@ def load_tritium():
 # Donate tritium
 def donate_tritium():
     set_status('Donating tritium')
-    if not press_and_find_set(ED_BACK, carrier_services_set): return False
+    if not press_and_find(ED_BACK, "carrier_services"): return False
     press(ED_UI_SELECT)
-    if not press_and_find(ED_UI_DOWN, 'images/tritium_depot.png'): return False
+    if not press_and_find(ED_UI_DOWN, 'tritium_depot'): return False
     press(ED_UI_SELECT)
     sleep(0.5)
-    if not press_and_find(ED_UI_UP, 'images/donate_tritium.png'): return False
+    if not press_and_find(ED_UI_UP, 'donate_tritium'): return False
     press(ED_UI_SELECT)
-    if not press_and_find(ED_UI_UP, 'images/confirm_deposit.png'): return False
+    if not press_and_find(ED_UI_UP, 'confirm_deposit'): return False
     press(ED_UI_SELECT)
     set_status('tritium donated')
-    if not press_and_find(ED_UI_DOWN, 'images/exit_door.png'): return False
+    if not press_and_find(ED_UI_DOWN, 'exit_door'): return False
     press(ED_UI_SELECT)
-    if not press_and_find_set(ED_BACK, carrier_services_set): return False
+    if not press_and_find(ED_BACK, "carrier_services"): return False
 
     return True
 
@@ -320,19 +337,19 @@ def empty_cargo():
     if not get_current_focus(): return False
 
     set_status('Emptying your cargo hold')
-    if not press_and_find_set(ED_BACK, carrier_services_set): return False
+    if not press_and_find(ED_BACK, "carrier_services"): return False
     press(ED_RIGHT_WINDOW, 0.5)
-    if not press_and_find('e', 'images/inventory.png'): return False
+    if not press_and_find('e', 'inventory'): return False
     press(ED_UI_RIGHT)
     press(ED_UI_UP)
-    if not press_and_find(ED_UI_RIGHT, 'images/transfer.png'): return False
+    if not press_and_find(ED_UI_RIGHT, 'transfer'): return False
     press(ED_UI_SELECT)
-    if not press_and_find(ED_UI_UP, 'images/all_to_carrier.png'): return False
+    if not press_and_find(ED_UI_UP, 'all_to_carrier'): return False
     press(ED_UI_SELECT)
     sleep(1)
     press(ED_UI_SELECT)
     set_status('Cargo hold emptied')
-    if not press_and_find_set(ED_BACK, carrier_services_set): return False
+    if not press_and_find(ED_BACK, "carrier_services"): return False
 
 
 # Select route file dialog

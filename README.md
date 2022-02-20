@@ -34,9 +34,9 @@ It has been tested on the most likely to be used ships:
 * Type 9
 * Beluga
 
-You can add your own image if needed for "Carrier Services" and "Carrier Management". 
+You can add your own images if needed in addition to the ones supplied. 
 To do so, take a screenshot, clip out just the button (you can see the existing images in the images/ folder).
-Save this image in the images/ folder and make sure it is named "carrier_services*.png" or "carrier_management*.png".
+Save this image in the images/ folder and make sure it is named "image-#.png".
 
 If you use the refuel option, make sure your ship has enough room for a full jumps worth of Tritium, 
 as much as 150 Tons if your carrier is fully loaded.   This option will load the carrier and the ship before 
