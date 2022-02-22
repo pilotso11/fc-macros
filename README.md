@@ -74,6 +74,7 @@ Likely causes:
 * Try running in windowed mode if you are in full-screen mode.  Alt-Enter to switch modes.
 * Try using the default UI brightness.
 * You can also try reducing the image matching confidence from the default value of 75.
+* Look at some of the suggestions in the thread on issue report number 2: https://github.com/pilotso11/fc-macros/issues/2 
 
 If image matching is an issue, you can try replacing the images with your own cropped screenshots.
 
