@@ -5,9 +5,10 @@ block_cipher = None
 
 added_files = [
          ( 'images/*', 'images' ),
-         ( 'awthemes-10.4.0/*', 'awthemes-10.4.0' ),
          ( 'README.md', '.' ),
          ( 'LICENSE', '.' ),
+         ( 'awthemes-10.4.0.zip', '.' ),
+         ( 'Tesseract-OCR.zip', '.' ),
          ]
 
 a = Analysis(['fcmacros.py'],

@@ -20,6 +20,7 @@ import logging
 import logging.handlers
 import sys
 import win32gui
+import zipfile
 
 VERSION = "0.1.5"
 BUNDLED = False
@@ -65,6 +66,17 @@ settings.add_setting("debug", int, default=0)
 settings.add_setting("grayscale", int, default=0)
 settings.add_setting("confidence", int, default=75)
 
+
+def check_for_themes():
+    logging.debug("Check for awthemes")
+    r = glob.glob("./awthemes-10.4.0/awthemes.tcl")
+    if len(r) == 0:
+        logging.info("Unzipping awthemes")
+        with zipfile.ZipFile("awthemes-10.4.0.zip", "r") as zipf:
+            zipf.extractall(".")
+
+
+check_for_themes()
 
 def set_debug_level():
     if settings.debug:
