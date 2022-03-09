@@ -13,16 +13,30 @@ import glob
 import getpass
 import os
 import usersettings
+import webbrowser
+import ocr
 from keymaps import *
 import logging
 import logging.handlers
 import sys
 import win32gui
 
-
-VERSION = "0.1.4"
+VERSION = "0.1.5"
 BUNDLED = False
 LOGFILE = "fcmacros.log"
+
+# Global state
+current_system = ''
+jumping = False
+cool_down = False
+auto_jump = False
+jump_one = False
+route = []
+next_waypoint = ''
+route_file = ""
+is_odyssey = False
+
+# Logging setup
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 handler = logging.handlers.RotatingFileHandler(
@@ -51,16 +65,35 @@ settings.add_setting("debug", int, default=0)
 settings.add_setting("grayscale", int, default=0)
 settings.add_setting("confidence", int, default=75)
 
-# Global state
-current_system = ''
-jumping = False
-cool_down = False
-auto_jump = False
-jump_one = False
-route = []
-next_waypoint = ''
-route_file = ""
-is_odyssey = False
+
+def set_debug_level():
+    if settings.debug:
+        logger.setLevel(logging.DEBUG)
+    else:
+        logger.setLevel(logging.INFO)
+
+
+def check_settings():
+    global route_file
+    if route_file == '' and settings.route_file > '':
+        route_file = settings.route_file
+        route_label.config(text=route_file)
+        load_route(route_file)
+    elif route_file != settings.route_file:
+        settings.route_file = route_file
+
+    settings.refuel = do_refuel.get()
+    settings.debug = DEBUG.get()
+    set_debug_level()
+    settings.grayscale = GRAYSCALE.get()
+    try:
+        settings.confidence = int(CONFIDENCE.get())
+    except ValueError:
+        pass
+
+    settings.save_settings()
+
+    root.after(1000, check_settings)
 
 
 # Find most recent E:D log file
@@ -114,7 +147,7 @@ def load_route(route_file_name):
 
 
 # Press down key for down_time and wait after for delay
-def press(key, delay=0.1, down_time=0.2):
+def press(key, delay=0.75, down_time=0.2):
     if key == '\b':
         out = "Press: backspace"
     elif key == '\t':
@@ -147,6 +180,7 @@ def get_matching_images(image):
         images_dict[image] = image_set
 
     return image_set
+
 
 # look for the image on screen , if found, return True
 # if not, press the key specified, true this up to max_trues times,
@@ -208,7 +242,7 @@ def mouse_click_at(x, y, pause=0.25, click_duration=0.25):
 # Move back to the carrier main screen after a jump
 def set_to_carrier():
     sleep(5)
-    if not ( press_and_find(ED_RIGHT_WINDOW, "inventory") or press_and_find(ED_RIGHT_WINDOW, "inventory_unselected") ): return False
+    if not (press_and_find(ED_RIGHT_WINDOW, "inventory") or press_and_find(ED_RIGHT_WINDOW, "inventory_unselected")): return False
     sleep(1)
     if not press_and_find(ED_BACK, "carrier_services"): return False
     press(ED_UI_SELECT)
@@ -302,7 +336,7 @@ def load_tritium():
     set_status('Filling ship with tritium')
     if not press_and_find(ED_BACK, "carrier_services"): return False
     press(ED_RIGHT_WINDOW, 0.5)
-    if not press_and_find('e', 'inventory'): return False
+    if not press_and_find(ED_MENU_RIGHT, 'inventory'): return False
     press(ED_UI_RIGHT)
     press(ED_UI_UP)
     if not press_and_find(ED_UI_RIGHT, 'transfer'): return False
@@ -354,7 +388,7 @@ def empty_cargo():
     set_status('Emptying your cargo hold')
     if not press_and_find(ED_BACK, "carrier_services"): return False
     press(ED_RIGHT_WINDOW, 0.5)
-    if not press_and_find('e', 'inventory'): return False
+    if not press_and_find(ED_MENU_RIGHT, 'inventory'): return False
     press(ED_UI_RIGHT)
     press(ED_UI_UP)
     if not press_and_find(ED_UI_RIGHT, 'transfer'): return False
@@ -466,6 +500,13 @@ row += 1
 ttk.Separator(frame, orient="horizontal").grid(column=0, row=row, columnspan=5, sticky="ew")
 row += 1
 
+ttk.Label(frame, text="Setup Beta: Capture some images (CARRIER SERVICES, CARRIER MANAGEMENT, INVENTORY ... see docs)").grid(column=0, row=row, columnspan=3, sticky="e")
+ttk.Label(frame, text="Ctrl+F2").grid(column=3, row=row, sticky="w")
+row += 1
+
+ttk.Separator(frame, orient="horizontal").grid(column=0, row=row, columnspan=5, sticky="ew")
+row += 1
+
 ttk.Label(frame, text="Current System:").grid(column=0, row=row, sticky="e")
 system_label = ttk.Label(frame, text="Unknown")
 system_label.grid(column=1, row=row, sticky="w")
@@ -505,14 +546,20 @@ ttk.Label(frame, text="Image matching confidence?").grid(column=2, row=row, stic
 #ttk.Checkbutton(frame, variable=GRAYSCALE).grid(column=3, row=row, sticky="w")
 ttk.Spinbox(frame, from_=10, to=90, textvariable=CONFIDENCE).grid(column=3, row=row, sticky="e")
 
-
 row += 1
 ttk.Label(frame, text="Version " + VERSION).grid(column=0, row=row, sticky="w")
-
 auto_jump_label = ttk.Label(frame, text="")
 auto_jump_label.grid(column=2, row=row, sticky="ew", columnspan=2)
 
+row += 1
+link1 = ttk.Label(frame, text="FCMacros Homepage (github)", cursor="hand2", foreground="lightblue")
+link1.grid(column=0, row=row, columnspan=4, sticky="w")
+link1.bind("<Button-1>", lambda e: callback("https://github.com/pilotso11/fc-macros"))
 ttk.Button(frame, text="Quit", command=root.destroy).grid(column=4, row=row)
+
+
+def callback(url):
+    webbrowser.open_new(url)
 
 
 def cool_down_complete():
@@ -624,15 +671,11 @@ def check_keys():
         set_status("Auto jump disabled")
         auto_jump = False
         auto_jump_label.config(text="")
+    if kb.is_pressed('ctrl+f2'):
+        ocr.capture_all_images()
+        return
 
     root.after(20, check_keys)
-
-
-def set_debug_level():
-    if settings.debug:
-        logger.setLevel(logging.DEBUG)
-    else:
-        logger.setLevel(logging.INFO)
 
 
 settings.load_settings()
@@ -641,30 +684,6 @@ DEBUG.set(settings.debug)
 set_debug_level()
 GRAYSCALE.set(settings.grayscale)
 CONFIDENCE.set(settings.confidence)
-
-
-def check_settings():
-    global route_file
-    if route_file == '' and settings.route_file > '':
-        route_file = settings.route_file
-        route_label.config(text=route_file)
-        load_route(route_file)
-    elif route_file != settings.route_file:
-        settings.route_file = route_file
-
-    settings.refuel = do_refuel.get()
-    settings.debug = DEBUG.get()
-    set_debug_level()
-    settings.grayscale = GRAYSCALE.get()
-    try:
-        settings.confidence = int(CONFIDENCE.get())
-    except ValueError:
-        pass
-
-    settings.save_settings()
-
-    root.after(1000, check_settings)
-
 
 log = get_latest_log_file()
 logging.info(f"Opening E:D log: {log}")
