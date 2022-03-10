@@ -80,7 +80,19 @@ If image matching is an issue, you can try replacing the images with your own cr
 
 If you have the source code version you can edit the keybindings in "keymaps.py".
 
+# Work in progress
 
+* Automatic setup by capturing the images for matching.  
+
+As of 0.1.5 (only from source code at the moment),
+Ctrl-F2 will run the UI and capture images for 
+  * *CARRIER SERVICES*
+  * *CARRIER MANAGEMENT*
+  * *INVENTORY*  (Selected and unselected)
+  * *TRANSFER*
+  * *TRITIUM DEPOT*
+
+Images are saved to the images/ folder with ID's of 99.
 
 -----------------
 

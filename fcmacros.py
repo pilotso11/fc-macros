@@ -36,7 +36,6 @@ route = []
 next_waypoint = ''
 route_file = ""
 is_odyssey = False
-BUNDLED = False
 
 # initialize settings
 settings = usersettings.Settings('com.ed.fcmacros')
@@ -463,21 +462,24 @@ def dark_style2(tk_root):
 
 
 ui_started = False
-root = None
-do_refuel = None
-DEBUG = None
-GRAYSCALE = None
-CONFIDENCE = None
-progress = None
-system_label = None
-route_label = None
-route_pos_label = None
-route_jump_label = None
-route_len_label = None
-auto_jump_label = None
-status = None
+root: Tk
+do_refuel: tkinter.IntVar
+DEBUG: tkinter.IntVar
+GRAYSCALE: tkinter.IntVar
+CONFIDENCE: tkinter.IntVar
+progress: tkinter.IntVar
+system_label: ttk.Label
+route_label: ttk.Label
+route_pos_label: ttk.Label
+route_jump_label: ttk.Label
+route_len_label: ttk.Label
+auto_jump_label: ttk.Label
+status: ttk.Label
 log = ""
-ed_log = None
+if log > "":
+    ed_log = open(log, 'r')
+else:
+    ed_log = None
 
 
 def on_debug_change(*args):
@@ -495,7 +497,7 @@ def setup_ui():
     root = Tk()
     root.title("Fleet Carrier Macros")
     root.iconbitmap('images/fc_icon.ico')
-    style = dark_style2(root)
+    dark_style2(root)
 
     do_refuel = tkinter.IntVar()
     DEBUG = tkinter.IntVar()
