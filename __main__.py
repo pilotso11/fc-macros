@@ -1,8 +1,8 @@
-from fcmacros import run_ui
+from fcmacros import run_main
 
 
 def main():
-    run_ui()
+    run_main()
 
 
 if __name__ == '__main__':

@@ -200,7 +200,7 @@ def test():
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     # gray_image = cv2.bitwise_not(gray_image)
     # gray_image = cv2.threshold(gray_image, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-    # gray_image = cv2.adaptiveThreshold(gray_image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+    # gray_image = cv2.adaptiveThreshold(gray_image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 5, 2)
     # edges = cv2.Canny(image, 50, 150)
 
     # threshold_image = cv2.threshold(gray_image, 50, 200, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
@@ -209,7 +209,7 @@ def test():
     # cv2.waitKey(0)
     # cv2.destroyAllWindows()
 
-    results = recognise(gray_image, debug=True)
+    results = recognise(gray_image, confidence=51, debug=True, show=True, save=True)
 
     mid = find_words(["INVENTORY"], results)
     if mid is not None:
@@ -336,7 +336,7 @@ def remove_perspective(image):
     cv2.imshow('warped image', warped_image)
 
 
-def recognise(image, debug=False, show=False, confidence=80):
+def recognise(image, debug=False, show=False, save=False, confidence=80):
     details = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT, config=custom_config, lang='eng')
 
     if debug:
@@ -357,6 +357,8 @@ def recognise(image, debug=False, show=False, confidence=80):
             cv2.imshow('captured text', image)
             cv2.waitKey(0)
             cv2.destroyAllWindows()
+        if save:
+            cv2.imwrite('debug.png', image)
 
     return details
 
@@ -421,11 +423,11 @@ def check_for_tesseract_exe():
 
 
 if __name__ == '__main__':
-    # test()
     check_for_tesseract_exe()
-    capture_carrier_services()
-    capture_inventory_and_transfer()
-    capture_carrier_management_and_tritium_depot()
+    test()
+    #capture_carrier_services()
+    #capture_inventory_and_transfer()
+    #capture_carrier_management_and_tritium_depot()
 
 
 def capture_all_images():

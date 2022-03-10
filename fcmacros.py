@@ -22,7 +22,7 @@ import sys
 import win32gui
 import zipfile
 
-VERSION = "0.1.5"
+VERSION = "0.1.6"
 BUNDLED = False
 LOGFILE = "fcmacros.log"
 
@@ -36,27 +36,7 @@ route = []
 next_waypoint = ''
 route_file = ""
 is_odyssey = False
-
-# Logging setup
-logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
-handler = logging.handlers.RotatingFileHandler(
-    LOGFILE, maxBytes=(1048576*5), backupCount=10
-)
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-
-if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-    BUNDLED = True
-else:
-    consoleHandler = logging.StreamHandler()
-    consoleHandler.setFormatter(formatter)
-    logger.addHandler(consoleHandler)
-
-logging.info(f"Starting fcmacros.py version: {VERSION}")
-if BUNDLED: logging.info('Running in a PyInstaller bundle')
-else: logging.info('Running as a console application')
+BUNDLED = False
 
 # initialize settings
 settings = usersettings.Settings('com.ed.fcmacros')
@@ -65,6 +45,31 @@ settings.add_setting("refuel", int, default=1)
 settings.add_setting("debug", int, default=0)
 settings.add_setting("grayscale", int, default=0)
 settings.add_setting("confidence", int, default=75)
+
+logger = logging.getLogger()
+
+
+def log_setup():
+    global BUNDLED
+    # Logging setup
+    logger.setLevel(logging.DEBUG)
+    handler = logging.handlers.RotatingFileHandler(
+        LOGFILE, maxBytes=(1048576*5), backupCount=10
+    )
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        BUNDLED = True
+    else:
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
+
+    logging.info(f"Starting fcmacros.py version: {VERSION}")
+    if BUNDLED: logging.info('Running in a PyInstaller bundle')
+    else: logging.info('Running as a console application')
 
 
 def check_for_themes():
@@ -75,8 +80,6 @@ def check_for_themes():
         with zipfile.ZipFile("awthemes-10.4.0.zip", "r") as zipf:
             zipf.extractall(".")
 
-
-check_for_themes()
 
 def set_debug_level():
     if settings.debug:
@@ -206,7 +209,7 @@ def press_and_find(key=ED_UI_LEFT, image='tritium', max_tries=10, do_log=True):
 
 
 # Locate an image(set) on the screen, return its found position
-def locate_on_screen(image='tritium', confidence=0.75, grayscale=False, do_log=True):
+def locate_on_screen(image='tritium', do_log=True):
     image_set = get_matching_images(image)
 
     grayscale = settings.grayscale == 1
@@ -453,121 +456,153 @@ def update_route_position():
 
 
 def dark_style2(tk_root):
-    _style = ttk.Style(root)
+    _style = ttk.Style(tk_root)
     tk_root.tk.call('source', 'awthemes-10.4.0/awdark.tcl')
     _style.theme_use('awdark')
     return _style
 
 
-# Setup UI
-root = Tk()
-root.title("Fleet Carrier Macros")
-root.iconbitmap('images/fc_icon.ico')
-style = dark_style2(root)
-
-do_refuel = tkinter.IntVar()
-DEBUG = tkinter.IntVar()
-GRAYSCALE = tkinter.IntVar()
-CONFIDENCE = tkinter.StringVar()
-CONFIDENCE.set("75")
+ui_started = False
+root = None
+do_refuel = None
+DEBUG = None
+GRAYSCALE = None
+CONFIDENCE = None
+progress = None
+system_label = None
+route_label = None
+route_pos_label = None
+route_jump_label = None
+route_len_label = None
+auto_jump_label = None
+status = None
+log = ""
+ed_log = None
 
 
 def on_debug_change(*args):
-    if DEBUG.get() == 1:
+    if DEBUG is not None and DEBUG.get() == 1:
         logging.info("Debug enabled")
     else:
         logging.info("Debug disabled")
     check_settings()
 
 
-DEBUG.trace_add("write", on_debug_change)
-GRAYSCALE.trace_add("write", on_debug_change)
-CONFIDENCE.trace_add("write", on_debug_change)
+# Setup UI
+def setup_ui():
+    global root, ui_started, do_refuel, DEBUG, GRAYSCALE, CONFIDENCE, progress, system_label, route_label, route_jump_label, route_len_label, route_pos_label, status, auto_jump_label, log, ed_log
 
-progress = tkinter.IntVar()
+    root = Tk()
+    root.title("Fleet Carrier Macros")
+    root.iconbitmap('images/fc_icon.ico')
+    style = dark_style2(root)
 
-frame = ttk.Frame(root, padding=10)
-frame.grid()
-row = 0
+    do_refuel = tkinter.IntVar()
+    DEBUG = tkinter.IntVar()
+    GRAYSCALE = tkinter.IntVar()
+    CONFIDENCE = tkinter.StringVar()
+    CONFIDENCE.set("75")
 
-ttk.Label(frame, text="Refuel Carrier:").grid(column=0, row=row, sticky="e")
-ttk.Label(frame, text="Ctrl+F11").grid(column=1, row=row, sticky="w")
+    DEBUG.trace_add("write", on_debug_change)
+    GRAYSCALE.trace_add("write", on_debug_change)
+    CONFIDENCE.trace_add("write", on_debug_change)
 
-ttk.Label(frame, text="Empty cargo hold:").grid(column=2, row=row, sticky="e")
-ttk.Label(frame, text="Ctrl+F5").grid(column=3, row=row, sticky="w")
-row += 1
+    progress = tkinter.IntVar()
 
-ttk.Label(frame, text="Enable autojump:").grid(column=0, row=row, sticky="e")
-ttk.Label(frame, text="Alt+F9").grid(column=1, row=row, sticky="w")
+    frame = ttk.Frame(root, padding=10)
+    frame.grid()
+    row = 0
 
-ttk.Label(frame, text="Cancel autojump:").grid(column=2, row=row, sticky="e")
-ttk.Label(frame, text="Ctrl+F10").grid(column=3, row=row, sticky="w")
-row += 1
+    ttk.Label(frame, text="Refuel Carrier:").grid(column=0, row=row, sticky="e")
+    ttk.Label(frame, text="Ctrl+F11").grid(column=1, row=row, sticky="w")
 
-ttk.Label(frame, text="Engage next jump on route:").grid(column=0, row=row, sticky="e")
-ttk.Label(frame, text="Ctrl+F9").grid(column=1, row=row, sticky="w")
-row += 1
+    ttk.Label(frame, text="Empty cargo hold:").grid(column=2, row=row, sticky="e")
+    ttk.Label(frame, text="Ctrl+F5").grid(column=3, row=row, sticky="w")
+    row += 1
 
+    ttk.Label(frame, text="Enable autojump:").grid(column=0, row=row, sticky="e")
+    ttk.Label(frame, text="Alt+F9").grid(column=1, row=row, sticky="w")
 
-ttk.Separator(frame, orient="horizontal").grid(column=0, row=row, columnspan=5, sticky="ew")
-row += 1
+    ttk.Label(frame, text="Cancel autojump:").grid(column=2, row=row, sticky="e")
+    ttk.Label(frame, text="Ctrl+F10").grid(column=3, row=row, sticky="w")
+    row += 1
 
-ttk.Label(frame, text="Setup Beta: Capture some images (CARRIER SERVICES, CARRIER MANAGEMENT, INVENTORY ... see docs)").grid(column=0, row=row, columnspan=3, sticky="e")
-ttk.Label(frame, text="Ctrl+F2").grid(column=3, row=row, sticky="w")
-row += 1
+    ttk.Label(frame, text="Engage next jump on route:").grid(column=0, row=row, sticky="e")
+    ttk.Label(frame, text="Ctrl+F9").grid(column=1, row=row, sticky="w")
+    row += 1
 
-ttk.Separator(frame, orient="horizontal").grid(column=0, row=row, columnspan=5, sticky="ew")
-row += 1
+    ttk.Separator(frame, orient="horizontal").grid(column=0, row=row, columnspan=5, sticky="ew")
+    row += 1
 
-ttk.Label(frame, text="Current System:").grid(column=0, row=row, sticky="e")
-system_label = ttk.Label(frame, text="Unknown")
-system_label.grid(column=1, row=row, sticky="w")
-row += 1
+    ttk.Label(frame, text="Setup Beta: Capture some images (CARRIER SERVICES, CARRIER MANAGEMENT, INVENTORY ... see docs)").grid(column=0, row=row, columnspan=3, sticky="e")
+    ttk.Label(frame, text="Ctrl+F2").grid(column=3, row=row, sticky="w")
+    row += 1
 
-ttk.Button(frame, text="Select Route", command=select_route_file).grid(column=0, row=row, sticky="e")
-route_label = ttk.Label(frame, text="Unknown")
-route_label.grid(column=1, row=row, sticky="w", columnspan=5)
-row += 1
+    ttk.Separator(frame, orient="horizontal").grid(column=0, row=row, columnspan=5, sticky="ew")
+    row += 1
 
-ttk.Label(frame, text="Refuel on jump?").grid(column=0, row=row, sticky="e")
-ttk.Checkbutton(frame, variable=do_refuel).grid(column=1, row=row, sticky="w")
-row += 1
+    ttk.Label(frame, text="Current System:").grid(column=0, row=row, sticky="e")
+    system_label = ttk.Label(frame, text="Unknown")
+    system_label.grid(column=1, row=row, sticky="w")
+    row += 1
 
-ttk.Label(frame, text="Destination:").grid(column=0, row=row, sticky="e")
-route_len_label = ttk.Label(frame, text="Unknown")
-route_len_label.grid(column=1, row=row, sticky="w", columnspan=3)
-row += 1
+    ttk.Button(frame, text="Select Route", command=select_route_file).grid(column=0, row=row, sticky="e")
+    route_label = ttk.Label(frame, text="Unknown")
+    route_label.grid(column=1, row=row, sticky="w", columnspan=5)
+    row += 1
 
-ttk.Label(frame, text="Progress:").grid(column=0, row=row, sticky="e")
-route_pos_label = ttk.Label(frame, text="Unknown")
-route_pos_label.grid(column=1, row=row, sticky="w", columnspan=3)
-row += 1
-ttk.Progressbar(frame, variable=progress, length=200).grid(column=1, row=row, columnspan=2, sticky="ew")
-row += 1
+    ttk.Label(frame, text="Refuel on jump?").grid(column=0, row=row, sticky="e")
+    ttk.Checkbutton(frame, variable=do_refuel).grid(column=1, row=row, sticky="w")
+    row += 1
 
-ttk.Separator(frame, orient="horizontal").grid(column=0, row=row, columnspan=5, sticky="ew")
-row += 1
+    ttk.Label(frame, text="Destination:").grid(column=0, row=row, sticky="e")
+    route_len_label = ttk.Label(frame, text="Unknown")
+    route_len_label.grid(column=1, row=row, sticky="w", columnspan=3)
+    row += 1
 
-status = ttk.Label(frame, text="")
-status.grid(column=0, row=row, columnspan=5, sticky="w")
-row += 1
+    ttk.Label(frame, text="Progress:").grid(column=0, row=row, sticky="e")
+    route_pos_label = ttk.Label(frame, text="Unknown")
+    route_pos_label.grid(column=1, row=row, sticky="w", columnspan=3)
+    row += 1
+    ttk.Progressbar(frame, variable=progress, length=200).grid(column=1, row=row, columnspan=2, sticky="ew")
+    row += 1
 
-ttk.Label(frame, text="Debug Log?").grid(column=0, row=row, sticky="e")
-ttk.Checkbutton(frame, variable=DEBUG).grid(column=1, row=row, sticky="w")
-ttk.Label(frame, text="Image matching confidence?").grid(column=2, row=row, sticky="e")
-#ttk.Checkbutton(frame, variable=GRAYSCALE).grid(column=3, row=row, sticky="w")
-ttk.Spinbox(frame, from_=10, to=90, textvariable=CONFIDENCE).grid(column=3, row=row, sticky="e")
+    ttk.Separator(frame, orient="horizontal").grid(column=0, row=row, columnspan=5, sticky="ew")
+    row += 1
 
-row += 1
-ttk.Label(frame, text="Version " + VERSION).grid(column=0, row=row, sticky="w")
-auto_jump_label = ttk.Label(frame, text="")
-auto_jump_label.grid(column=2, row=row, sticky="ew", columnspan=2)
+    status = ttk.Label(frame, text="")
+    status.grid(column=0, row=row, columnspan=5, sticky="w")
+    row += 1
 
-row += 1
-link1 = ttk.Label(frame, text="FCMacros Homepage (github)", cursor="hand2", foreground="lightblue")
-link1.grid(column=0, row=row, columnspan=4, sticky="w")
-link1.bind("<Button-1>", lambda e: callback("https://github.com/pilotso11/fc-macros"))
-ttk.Button(frame, text="Quit", command=root.destroy).grid(column=4, row=row)
+    ttk.Label(frame, text="Debug Log?").grid(column=0, row=row, sticky="e")
+    ttk.Checkbutton(frame, variable=DEBUG).grid(column=1, row=row, sticky="w")
+    ttk.Label(frame, text="Image matching confidence?").grid(column=2, row=row, sticky="e")
+    # ttk.Checkbutton(frame, variable=GRAYSCALE).grid(column=3, row=row, sticky="w")
+    ttk.Spinbox(frame, from_=10, to=90, textvariable=CONFIDENCE).grid(column=3, row=row, sticky="e")
+
+    row += 1
+    ttk.Label(frame, text="Version " + VERSION).grid(column=0, row=row, sticky="w")
+    auto_jump_label = ttk.Label(frame, text="")
+    auto_jump_label.grid(column=2, row=row, sticky="ew", columnspan=2)
+
+    row += 1
+    link1 = ttk.Label(frame, text="FCMacros Homepage (github)", cursor="hand2", foreground="lightblue")
+    link1.grid(column=0, row=row, columnspan=4, sticky="w")
+    link1.bind("<Button-1>", lambda e: callback("https://github.com/pilotso11/fc-macros"))
+    ttk.Button(frame, text="Quit", command=root.destroy).grid(column=4, row=row)
+
+    settings.load_settings()
+    do_refuel.set(settings.refuel)
+    DEBUG.set(settings.debug)
+    set_debug_level()
+    GRAYSCALE.set(settings.grayscale)
+    CONFIDENCE.set(settings.confidence)
+
+    log = get_latest_log_file()
+    logging.info(f"Opening E:D log: {log}")
+    ed_log = open(log, 'r')
+
+    return root
 
 
 def callback(url):
@@ -612,7 +647,7 @@ def process_log():
         curr_sys = ''
         for line in lines:
             line = line.strip()
-            #logging.debug(line)
+            # logging.debug(line)
             if line.count('StarSystem') > 0:
                 curr_sys = line
             if line.count('Odyssey') > 0:
@@ -690,27 +725,24 @@ def check_keys():
     root.after(20, check_keys)
 
 
-settings.load_settings()
-do_refuel.set(settings.refuel)
-DEBUG.set(settings.debug)
-set_debug_level()
-GRAYSCALE.set(settings.grayscale)
-CONFIDENCE.set(settings.confidence)
-
-log = get_latest_log_file()
-logging.info(f"Opening E:D log: {log}")
-ed_log = open(log, 'r')
-
-
 # Run the UI
 def run_ui():
+    ui_root = setup_ui()
     check_newer_log()  # Start checking for log rotation
     process_log()  # start log processing
     check_settings()  # start monitoring settings
     check_keys()  # start key monitoring
-    root.mainloop()  # run
+    ui_root.mainloop()  # run
+
+
+def run_main():
+    global ui_started
+    if ui_started: return
+    ui_started = True
+    log_setup()
+    check_for_themes()
+    run_ui()
 
 
 if __name__ == '__main__':
-    run_ui()
-
+    run_main()
