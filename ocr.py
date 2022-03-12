@@ -140,9 +140,6 @@ def capture_carrier_management_and_tritium_depot_1(*args):
 
 # Screencap selected INVENTORY menu
 def capture_inventory_and_transfer(debug=False):
-    region = (600, 220, 1200, 200)
-    inventory_box = None
-    transfer_box = None
     cnt = 0
     while not fcmacros.get_current_focus():
         cnt += 1
@@ -152,67 +149,30 @@ def capture_inventory_and_transfer(debug=False):
             return False
         sleep(2)
 
+    fcmacros.press(ED_RIGHT_WINDOW)
+    sleep(1)
     while True:
-        image = get_cv_screenshot(region)
-        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        gray_image = cv2.threshold(gray_image, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-        results = recognise(gray_image, debug=False, confidence=50)
-        mid = find_words(["INVENTORY"], results)
-        mid_trans = find_words(["TRANSFER"], results, confidence=50)
-        ship_mid = find_words(["SHIP"], results)
-
-        if mid_trans is not None and transfer_box is None:
-            transfer_box = mid_trans
-        if mid is None and inventory_box is None and ship_mid is None:
-            logging.debug("Menu not found")
-            fcmacros.press(ED_MENU_RIGHT)
-            fcmacros.press(ED_RIGHT_WINDOW, delay=1)
-        elif mid is None and inventory_box is None:
-            fcmacros.press(ED_MENU_LEFT)
-        elif mid is None:
-            if mid_trans is None:  # Maybe smoke on the label?
-                sleep(1)
-                continue
-            logging.debug("Inventory not found - get screencap")
-            x, y, x2, y2 = inventory_box[0], inventory_box[1], inventory_box[2], inventory_box[3]
-            x += region[0]
-            y += region[1]
-            x2 += region[0]
-            y2 += region[1]
-            part = get_and_save_cv_screenshot('images/inventory99.png', x, y, x2, y2)
+        if get_average_color_bw(INVENTORY_POS) > 128:
+            part = get_and_save_cv_screenshot_region('images/inventory99.png', INVENTORY_POS)
             if debug:
                 cv2.imshow('inventory', part)
-            fcmacros.set_status('Saved inventory99.png')
             fcmacros.press(ED_UI_RIGHT)
             fcmacros.press(ED_UI_RIGHT)
-            x, y, x2, y2 = transfer_box[0], transfer_box[1], transfer_box[2], transfer_box[3]
-            x += region[0]
-            y += region[1]
-            x2 += region[0]
-            y2 += region[1]
-            part = get_and_save_cv_screenshot('images/transfer99.png', x, y, x2, y2)
-            fcmacros.set_status('Saved transfer99.png')
-            if debug:
-                cv2.imshow('transfer', part)
-                cv2.waitKey(0)
-            fcmacros.press(ED_BACK)
-            fcmacros.press(ED_BACK)
-            fcmacros.root.after(100, after_capture_inventory)
-            return True
-        else:
-            if inventory_box is None:
-                logging.debug(f"INVENTORY at {mid}")
-                inventory_box = mid
-                x, y, x2, y2 = inventory_box[0], inventory_box[1], inventory_box[2], inventory_box[3]
-                x += region[0]
-                y += region[1]
-                x2 += region[0]
-                y2 += region[1]
-                part = get_and_save_cv_screenshot('images/inventory_unselected99.png', x, y, x2, y2)
+            if get_average_color_bw(TRANSFER_POS) <= 128:
+                fcmacros.press(ED_UI_UP)
+                fcmacros.press(ED_UI_RIGHT)
+            if get_average_color_bw(TRANSFER_POS) > 128:
+                part = get_and_save_cv_screenshot_region('images/transfer99.png', TRANSFER_POS)
                 if debug:
-                    cv2.imshow('unselected', part)
-                fcmacros.set_status('Saved inventory_unselected99.png')
-            fcmacros.press(ED_MENU_RIGHT, delay=0.5)
+                    cv2.imshow('transfer', part)
+                fcmacros.set_status('Saved inventory99.png and transfer99.png')
+                fcmacros.root.after(100, after_capture_inventory)
+            else:
+                fcmacros.set_status("Unable to find selected transfer")
+
+            return
+        else:
+            fcmacros.press(ED_MENU_RIGHT)
 
 
 # Screencap CARRIER SERVICES selected
@@ -381,6 +341,20 @@ def get_screen_width():
     return image.shape
 
 
+def is_text_on_screen_list(words_list, region=None, debug=False, save="", show=False):
+    image = get_cv_screenshot(region)
+    gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    results = recognise(gray_image, confidence=51, debug=debug, save=len(save) > 0, show=True, save_suffix=save)
+    for words in words_list:
+        res = find_words(words, results)
+        if res is not None:
+            logging.debug(f"Found {words} at {res}")
+            return True, res
+
+    return False, None
+
+
 def is_text_on_screen(words, region=None, debug=False, save="", show=False):
     image = get_cv_screenshot(region)
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -389,6 +363,33 @@ def is_text_on_screen(words, region=None, debug=False, save="", show=False):
     res = find_words(words, results)
     if res is None: return False, None
     return True, res
+
+
+def get_average_color(region):
+    image = get_cv_screenshot(region)
+    avg_color_per_row = np.average(image, axis=0)
+    avg_color = np.average(avg_color_per_row, axis=0)
+    logging.debug(f"Average color at {region} is {avg_color}")
+    return avg_color
+
+
+def get_average_color_gray(region):
+    image = get_cv_screenshot(region)
+    gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    avg_color_per_row = np.average(gray_image, axis=0)
+    avg_color = np.average(avg_color_per_row, axis=0)
+    logging.debug(f"Average color at {region} is {avg_color}")
+    return avg_color
+
+
+def get_average_color_bw(region):
+    image = get_cv_screenshot(region)
+    gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    gray_image = cv2.threshold(gray_image, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+    avg_color_per_row = np.average(gray_image, axis=0)
+    avg_color = np.average(avg_color_per_row, axis=0)
+    logging.debug(f"Average color at {region} is {avg_color}")
+    return avg_color
 
 
 # Capture the screen and ORR it, show the results

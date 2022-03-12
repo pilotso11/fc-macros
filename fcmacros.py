@@ -229,6 +229,16 @@ def press_and_find_text(key, words, region=None, max_tries=10):
     return False
 
 
+def press_and_find_text_list(key, words_list, region=None, max_tries=10):
+    while max_tries >= 0:
+        max_tries -= 1
+        found, where = ocr.is_text_on_screen_list(words_list, region=region)
+        if found:
+            return True
+        press(key)
+    return False
+
+
 # Locate an image(set) on the screen, return its found position
 def locate_on_screen(image='tritium', do_log=True):
     image_set = get_matching_images(image)
@@ -278,8 +288,7 @@ def mouse_click_at(x, y, pause=0.25, click_duration=0.25):
 # Move back to the carrier main screen after a jump
 def set_to_carrier():
     sleep(5)
-    if not press_and_find_text(ED_RIGHT_WINDOW, "MODULES"): return False
-    #if not (press_and_find(ED_RIGHT_WINDOW, "inventory") or press_and_find(ED_RIGHT_WINDOW, "inventory_unselected")): return False
+    if not press_and_find_text_list(ED_RIGHT_WINDOW, [["MODULES"], ["STATUS"], ["FIRE", "GROUPS"]]): return False
     sleep(1)
     if not press_and_find(ED_BACK, "carrier_services"): return False
     press(ED_UI_SELECT)
