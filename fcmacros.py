@@ -356,11 +356,7 @@ def find_system_and_jump_2(*args):
     sleep(1)
     mouse_click_at(x, y + pos.height)
     sleep(2)
-    pos = locate_on_screen('set_carrier_destination')
-    if pos is None:
-        set_status("Unable to find set carrier destination")
-        return False
-    x, y = pos.left + pos.width // 2, pos.top + pos.height // 2
+    x, y = SET_CARRIER_DESTINATION_POS[0] + SET_CARRIER_DESTINATION_POS[2]//2, SET_CARRIER_DESTINATION_POS[1] + SET_CARRIER_DESTINATION_POS[3]//2
     mouse_click_at(x, y)
     set_status("Jump set for {}".format(next_waypoint))
     jumping = True

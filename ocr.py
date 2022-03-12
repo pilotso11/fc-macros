@@ -9,6 +9,7 @@ from locations import *
 import logging
 import glob
 import zipfile
+import keyboard as kb
 
 # Teserect installer for windows
 # https://github.com/UB-Mannheim/tesseract/wiki
@@ -66,7 +67,7 @@ def capture_navigation_2(*args):
         cv2.imshow('open_galmap', part)
     fcmacros.set_status('Saved open_galmap99.png')
     fcmacros.press(ED_UI_SELECT)
-    fcmacros.root.after(1000, capture_navigation_3, debug)
+    fcmacros.root.after(2000, capture_navigation_3, debug)
 
 
 def capture_navigation_3(*args):
@@ -75,6 +76,15 @@ def capture_navigation_3(*args):
     if debug:
         cv2.imshow('search_the_galaxy', part)
     fcmacros.set_status('Saved search_the_galaxy99.png')
+    fcmacros.mouse_click_at(GALMAP_SEARCH[0]+GALMAP_SEARCH[1]//2, GALMAP_SEARCH[1]+GALMAP_SEARCH[3]//2)
+    kb.write("SOL")
+    sleep(1.5)
+    part = get_and_save_cv_screenshot_region('images/search_go_to99.png', GO_TO_LOCATION_POS)
+    if debug:
+        cv2.imshow('search_the_galaxy', part)
+    fcmacros.mouse_click_at(GO_TO_LOCATION_POS[0]+GO_TO_LOCATION_POS[1]//2, GO_TO_LOCATION_POS[1]+GO_TO_LOCATION_POS[3]//2)
+
+    fcmacros.press(ED_BACK)
     fcmacros.press(ED_BACK)
     fcmacros.press(ED_BACK)
     fcmacros.root.after(1000, capture_navigation_4, debug)
