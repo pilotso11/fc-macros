@@ -373,7 +373,7 @@ def load_tritium_2(*args):
     # hold down the ED_UI_LEFT key until max capacity is reached
     kb.press(ED_UI_LEFT)
     logging.debug(f"Press and hold {ED_UI_LEFT}")
-    while locate_on_screen('max_capacity') is None:
+    while not ocr.is_text_on_screen(["MAX", "CAPACITY"], [685, 350, 125, 50], debug=False) and locate_on_screen('max_capacity') is None:
         sleep(0.5)
     logging.debug(f"max_capacity found")
     logging.debug(f"Release {ED_UI_LEFT}")

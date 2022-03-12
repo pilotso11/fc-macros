@@ -192,8 +192,8 @@ def capture_carrier_services(debug=False):
                 fcmacros.press(ED_UI_UP, delay=0.5)
 
 
+# Capture, regocnise, show and save the current screen
 def test():
-    image1 = cv2.imread('test/test5.jpg')
     image = get_cv_screenshot()
     # cv2.imshow('screen', image)
     # cv2.waitKey(0)
@@ -209,133 +209,14 @@ def test():
     # cv2.waitKey(0)
     # cv2.destroyAllWindows()
 
-    results = recognise(gray_image, confidence=51, debug=True, show=True, save=True)
-
-    mid = find_words(["INVENTORY"], results)
-    if mid is not None:
-        print(f"Found INVENTORY at {mid}")
+    recognise(gray_image, confidence=51, debug=True, show=True, save=True)
 
 
-def dist(x1, y1, x2, y2):
-    try:
-        result = np.sqrt((x2 - x1) ** 2 - (y1 - y2) ** 2)
-        return result
-    except RuntimeWarning:
-        return 0
-
-
-# Find closest set of lines
-def find_close(lines, max_dist=20):
-    max_set = []
-    for line in lines:
-        results = [line]
-        for x1, y1, x2, y2 in line:
-            for line2 in lines:
-                for x3, y3, x4, y4 in line2:
-                    d1 = dist(x1, y1, x3, y3)
-                    d2 = dist(x2, y2, x4, y4)
-                    if 0 < d1 < max_dist and d2 < max_dist:
-                        results.append(line2)
-        if len(results) > len(max_set):
-            max_set = results
-    return max_set
-
-
-# Box is top left, top right, bottom left, bottom right
-# Find largest box encompassing the lines provided
-def get_bounding_box(lines):
-    x_tl, y_tl, x_tr, y_tr, x_bl, y_bl, x_br, y_br = 0, 0, 0, 0, 0, 0, 0, 0
-    for line in lines:
-        for x1, y1, x2, y2 in line:
-            if x_tl == 0:
-                x_tl = x1
-                x_bl = x1
-                y_tl = y1
-                y_bl = y1
-                x_tr = x2
-                x_br = x2
-                y_tr = y2
-                y_br = y2
-            else:
-                x_tl = min(x_tl, x1)
-                y_tl = min(y_tl, y1)
-                x_bl = max(x_bl, x1)
-                y_bl = max(y_bl, y1)
-
-                x_tr = min(x_tr, x2)
-                y_tr = min(y_tr, y2)
-                x_br = max(x_br, x2)
-                y_br = max(y_br, y2)
-    return x_tl, y_tl, x_tr, y_tr, x_bl, y_bl, x_br, y_br
-
-
-# Box is top left, top right, bottom left, bottom right
-def bounding_box_scale(w, h, bound_box):
-    x_tl, y_tl, x_tr, y_tr, x_bl, y_bl, x_br, y_br = bound_box[0], bound_box[1], bound_box[2], bound_box[3], bound_box[
-        4], bound_box[5], bound_box[6], bound_box[7]
-    x_scale = w / (x_tr - x_tl)
-    y_scale = x_scale  # h / (y_bl-y_tl)
-
-    x_missing = w - (x_tr * x_scale - x_tl)
-    y_missing = h - (y_bl * y_scale - y_tl)
-    x_shift = x_tl
-    y_shift = y_tl
-
-    x_tl = x_tl - x_shift
-    x_tr = x_tr * x_scale - x_shift + x_missing
-    x_bl = x_bl - x_shift
-    x_br = x_br * x_scale - x_shift + x_missing
-
-    y_tl = y_tl - y_shift
-    y_bl = y_bl * y_scale - y_shift + y_missing
-    y_tr = y_tr - y_shift
-    y_br = y_br * y_scale - y_shift + y_missing
-
-    if x_tr < 0:
-        x_tl -= x_tr
-        x_bl -= x_tr
-        x_br -= x_tr
-        x_tr = 0
-    if y_tr < 0:
-        y_bl -= y_tr
-        y_tl -= y_tr
-        y_br -= y_tr
-        y_tr = 0
-
-    return x_tl, y_tl, x_tr, y_tr, x_bl, y_bl, x_br, y_br
-
-
-def remove_perspective(image):
-    threshold_image = cv2.threshold(image, 50, 200, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-    cv2.imshow('threshold', threshold_image)
-    edges = cv2.Canny(threshold_image, 50, 150)
-    cv2.imshow('edges', edges)
-    lines = cv2.HoughLinesP(threshold_image, 1, np.pi / 180, 15, minLineLength=400, maxLineGap=30)
-    line_image = np.copy(image) * 0  # creating a blank to draw lines on
-    for line in lines:
-        for x1, y1, x2, y2 in line:
-            slope = (x2 - x1) / (y2 - y1)
-            cv2.line(line_image, (x1, y1), (x2, y2), (255, 0, 0), 1)
-
-    close = find_close(lines)
-    bound_box = get_bounding_box(close)
-    print(f'--------Closest size {len(close)}--------')
-    print(close)
-    print('--------')
-    print(
-        f'Bounding box = ({bound_box[0]},{bound_box[1]}) ({bound_box[2]},{bound_box[3]}) ({bound_box[4]},{bound_box[5]}) ({bound_box[6]},{bound_box[7]})')
-    window_box = bounding_box_scale(1500, 900, bound_box)
-    x1, y1, x2, y2, x3, y3, x4, y4 = window_box[0], window_box[1], window_box[2], window_box[3], window_box[4], \
-                                     window_box[5], window_box[6], window_box[7]
-    print(f'Scaled box = ({x1},{y1}) ({x2},{y2}) ({x3},{y3}) ({x4},{y4}) ')
-    cv2.imshow('line image', line_image)
-    pts_src = np.float32([[x1, y1], [x2, y2], [x3, y3], [x4, y4]])
-    pts_dst = np.float32([[0.0, 0.0], [1500.0, 0.0], [0.0, 900.0], [1500.0, 900.0]])
-    xform = cv2.getPerspectiveTransform(pts_src, pts_dst)
-    warped_image = cv2.warpPerspective(image, xform, (1500, 900))
-    cv2.imshow('warped image', warped_image)
-
-
+# Recognize text in image
+# If debug is true then:
+#    Text recognized with details will be logged
+#    Show will create bounding boxes on an image copy and show it
+#    Save will save the image
 def recognise(image, debug=False, show=False, save=False, confidence=80):
     details = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT, config=custom_config, lang='eng')
 
@@ -351,7 +232,7 @@ def recognise(image, debug=False, show=False, save=False, confidence=80):
                     details['width'][sequence_number],
                     details['height'][sequence_number])
                 image = cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
-                print(
+                logging.debug(
                     f"'{details['text'][sequence_number]}' conf={details['conf'][sequence_number]} at {x},{y} - {w},{h}")
         if show:
             cv2.imshow('captured text', image)
@@ -363,7 +244,8 @@ def recognise(image, debug=False, show=False, save=False, confidence=80):
     return details
 
 
-def get_box_dist(x1, y1, w1, h1, x2, y2, w2, h2):
+# Find min distance of two boxes (H or V, it doesn't look for a diagonal)
+def get_box_dist(x1, y1, w1, h1, x2, y2):
     d = 1000
     d = min(d, abs(x1 - x2))
     d = min(d, abs(y1 - y2))
@@ -372,6 +254,7 @@ def get_box_dist(x1, y1, w1, h1, x2, y2, w2, h2):
     return d
 
 
+# Find bounding area for a set of locations (close words)
 def get_box_from_set(locs):
     max_x = 0
     min_x = 10000
@@ -406,7 +289,7 @@ def find_words(words, results, confidence=90, max_dist=50):
                     (x2, y2, w2, h2) = (
                         results['left'][j], results['top'][j], results['width'][j], results['height'][j])
                     if conf > confidence and text == word:
-                        if get_box_dist(x, y, w, h, x2, y2, w2, h2) < max_dist:
+                        if get_box_dist(x, y, w, h, x2, y2) < max_dist:   # w2, h2 not used
                             print(f"found {word} at {x2},{y2} {w2}x{h2}")
                             loc.append((x2, y2, w2, h2))
                             if len(loc) == len(words):
@@ -427,6 +310,16 @@ if __name__ == '__main__':
     test()
 
 
+def is_text_on_screen(words, region=None, debug=False):
+    image = get_cv_screenshot(region)
+    gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    results = recognise(gray_image, confidence=51, debug=debug, save=True, show=True)
+    res = find_words(words, results)
+    if res is None: return False, None
+    return True, res
+
+
 # Capture the screen and ORR it, show the results
 def capture_debug():
     check_for_tesseract_exe()
@@ -442,4 +335,3 @@ def capture_all_images():
     a, b = capture_carrier_management_and_tritium_depot()
     if a is None: return
     fcmacros.set_status("Saved images .... ")
-
