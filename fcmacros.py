@@ -16,6 +16,7 @@ import usersettings
 import webbrowser
 import ocr
 from keymaps import *
+from locations import *
 import logging
 import logging.handlers
 import sys
@@ -36,6 +37,7 @@ route = []
 next_waypoint = ''
 route_file = ""
 is_odyssey = False
+screen_shape = 1080
 
 # initialize settings
 settings = usersettings.Settings('com.ed.fcmacros')
@@ -129,6 +131,16 @@ def get_current_focus():
     return True
 
 
+# This is almost certainly wrong
+# @TODO: Work out how to scale when the screen is not an equal of 1080x1920
+def region_scale(region):
+    ratio = screen_shape / 1080
+    new_region = []
+    for r in region:
+        new_region.append(r * ratio)
+    return new_region
+
+
 # Load and parse the route.csv
 def load_route(route_file_name):
     global route, route_file
@@ -207,6 +219,16 @@ def press_and_find(key=ED_UI_LEFT, image='tritium', max_tries=10, do_log=True):
     return press_and_find_set(key, image_set, max_tries, confidence, grayscale, do_log)
 
 
+def press_and_find_text(key, words, region=None, max_tries=10):
+    while max_tries >= 0:
+        max_tries -= 1
+        found, where = ocr.is_text_on_screen(words, region=region)
+        if found:
+            return True
+        press(key)
+    return False
+
+
 # Locate an image(set) on the screen, return its found position
 def locate_on_screen(image='tritium', do_log=True):
     image_set = get_matching_images(image)
@@ -256,7 +278,8 @@ def mouse_click_at(x, y, pause=0.25, click_duration=0.25):
 # Move back to the carrier main screen after a jump
 def set_to_carrier():
     sleep(5)
-    if not (press_and_find(ED_RIGHT_WINDOW, "inventory") or press_and_find(ED_RIGHT_WINDOW, "inventory_unselected")): return False
+    if not press_and_find_text(ED_RIGHT_WINDOW, "MODULES"): return False
+    #if not (press_and_find(ED_RIGHT_WINDOW, "inventory") or press_and_find(ED_RIGHT_WINDOW, "inventory_unselected")): return False
     sleep(1)
     if not press_and_find(ED_BACK, "carrier_services"): return False
     press(ED_UI_SELECT)
@@ -373,7 +396,7 @@ def load_tritium_2(*args):
     # hold down the ED_UI_LEFT key until max capacity is reached
     kb.press(ED_UI_LEFT)
     logging.debug(f"Press and hold {ED_UI_LEFT}")
-    while not ocr.is_text_on_screen(["MAX", "CAPACITY"], [685, 350, 125, 50], debug=False) and locate_on_screen('max_capacity') is None:
+    while not ocr.is_text_on_screen(["MAX", "CAPACITY"], region_scale(MAX_CAPACITY_POS), debug=True, save='max_capacity', show=False) and locate_on_screen('max_capacity') is None:
         sleep(0.5)
     logging.debug(f"max_capacity found")
     logging.debug(f"Release {ED_UI_LEFT}")
@@ -764,11 +787,12 @@ def run_ui():
 
 
 def run_main():
-    global ui_started
+    global ui_started, screen_shape
     if ui_started: return
     ui_started = True
     log_setup()
     check_for_themes()
+    screen_shape = ocr.get_screen_width()
     run_ui()
 
 

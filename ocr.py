@@ -5,6 +5,7 @@ import numpy as np
 import fcmacros
 from time import sleep
 from keymaps import *
+from locations import *
 import logging
 import glob
 import zipfile
@@ -26,7 +27,15 @@ def get_cv_screenshot(region=None):
     return image
 
 
-# Take a screenshot and save it , with region, return CV image
+# Take a screenshot and save it , with region x, y, w, h, return CV image
+def get_and_save_cv_screenshot_region(file, region):
+    pil_image = pyautogui.screenshot(file, region=region)
+    image = np.array(pil_image)
+    image = image[:, :, ::-1].copy()
+    return image
+
+
+# Take a screenshot and save it , with region, x, y, x2, y2, return CV image
 def get_and_save_cv_screenshot(file, x, y, x2, y2):
     pil_image = pyautogui.screenshot(file, region=(x - 5, y - 5, x2 - x + 10, y2 - y + 10))
     image = np.array(pil_image)
@@ -34,10 +43,65 @@ def get_and_save_cv_screenshot(file, x, y, x2, y2):
     return image
 
 
+def capture_navigation(debug=False):
+    fcmacros.set_to_carrier()
+    fcmacros.press_and_find(ED_UI_DOWN, "tritium_depot")
+    fcmacros.press_and_find(ED_UI_RIGHT, "carrier_management")
+    fcmacros.press(ED_UI_SELECT)
+    sleep(1)
+    fcmacros.press(ED_UI_DOWN)
+    sleep(1)
+    part = get_and_save_cv_screenshot_region('images/navigation99.png', NAVIGATION_IMAGE)
+    if debug:
+        cv2.imshow('navigation', part)
+    fcmacros.set_status('Saved navigation99.png')
+    fcmacros.press(ED_UI_SELECT)
+    fcmacros.root.after(1000, capture_navigation_2, debug)
+
+
+def capture_navigation_2(*args):
+    debug = args[0]
+    part = get_and_save_cv_screenshot_region('images/open_galmap99.png', GALMAP_IMAGE)
+    if debug:
+        cv2.imshow('open_galmap', part)
+    fcmacros.set_status('Saved open_galmap99.png')
+    fcmacros.press(ED_UI_SELECT)
+    fcmacros.root.after(1000, capture_navigation_3, debug)
+
+
+def capture_navigation_3(*args):
+    debug = args[0]
+    part = get_and_save_cv_screenshot_region('images/search_the_galaxy99.png', GALMAP_SEARCH)
+    if debug:
+        cv2.imshow('search_the_galaxy', part)
+    fcmacros.set_status('Saved search_the_galaxy99.png')
+    fcmacros.press(ED_BACK)
+    fcmacros.press(ED_BACK)
+    fcmacros.root.after(1000, capture_navigation_4, debug)
+
+
+def capture_navigation_4(*args):
+    debug = args[0]
+    fcmacros.press_and_find(ED_UI_DOWN, "tritium_depot")
+    fcmacros.press(ED_UI_SELECT)
+    sleep(1)
+    fcmacros.press(ED_UI_DOWN)
+    part = get_and_save_cv_screenshot_region('images/exit_door99.png', TRITIUM_EXIT)
+    if debug:
+        cv2.imshow('exit door', part)
+    fcmacros.set_status('Saved exit_door99.png')
+    fcmacros.press(ED_UI_SELECT)
+    fcmacros.root.after(100, after_capture_navigation)
+
+
 # Screencap CARRIER MANAGEMENT selected
 def capture_carrier_management_and_tritium_depot(debug=False):
     fcmacros.set_to_carrier()
-    sleep(5)  # Wait for fleet carrier to be ready
+    fcmacros.root.after(5000, capture_carrier_management_and_tritium_depot_1, debug)
+
+
+def capture_carrier_management_and_tritium_depot_1(*args):
+    debug = args[0]
     image = get_cv_screenshot()
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     results = recognise(gray_image)
@@ -71,13 +135,12 @@ def capture_carrier_management_and_tritium_depot(debug=False):
         cv2.waitKey(0)
     fcmacros.set_status('Saved carrier_management99.png')
     fcmacros.press(ED_BACK)
-    return mid_cm, mid_td
+    fcmacros.root.after(100, after_capture_carrier_management, mid_cm, mid_td)
 
 
 # Screencap selected INVENTORY menu
 def capture_inventory_and_transfer(debug=False):
     region = (600, 220, 1200, 200)
-    sleep(2)
     inventory_box = None
     transfer_box = None
     cnt = 0
@@ -93,7 +156,7 @@ def capture_inventory_and_transfer(debug=False):
         image = get_cv_screenshot(region)
         gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         gray_image = cv2.threshold(gray_image, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-        results = recognise(gray_image, debug=True, confidence=50)
+        results = recognise(gray_image, debug=False, confidence=50)
         mid = find_words(["INVENTORY"], results)
         mid_trans = find_words(["TRANSFER"], results, confidence=50)
         ship_mid = find_words(["SHIP"], results)
@@ -134,10 +197,11 @@ def capture_inventory_and_transfer(debug=False):
                 cv2.waitKey(0)
             fcmacros.press(ED_BACK)
             fcmacros.press(ED_BACK)
+            fcmacros.root.after(100, after_capture_inventory)
             return True
         else:
             if inventory_box is None:
-                print(f"INVENTORY at {mid}")
+                logging.debug(f"INVENTORY at {mid}")
                 inventory_box = mid
                 x, y, x2, y2 = inventory_box[0], inventory_box[1], inventory_box[2], inventory_box[3]
                 x += region[0]
@@ -187,6 +251,7 @@ def capture_carrier_services(debug=False):
                 if debug:
                     cv2.imshow('screencap', part)
                     cv2.waitKey(0)
+                fcmacros.root.after(100, after_capture_carrier_services)
                 return True
             else:
                 fcmacros.press(ED_UI_UP, delay=0.5)
@@ -217,7 +282,7 @@ def test():
 #    Text recognized with details will be logged
 #    Show will create bounding boxes on an image copy and show it
 #    Save will save the image
-def recognise(image, debug=False, show=False, save=False, confidence=80):
+def recognise(image, debug=False, show=False, save=False, confidence=80, save_suffix=""):
     details = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT, config=custom_config, lang='eng')
 
     if debug:
@@ -239,7 +304,7 @@ def recognise(image, debug=False, show=False, save=False, confidence=80):
             cv2.waitKey(0)
             cv2.destroyAllWindows()
         if save:
-            cv2.imwrite('debug.png', image)
+            cv2.imwrite(f'debug_{save_suffix}.png', image)
 
     return details
 
@@ -277,7 +342,7 @@ def find_words(words, results, confidence=90, max_dist=50):
         text = results['text'][i]
         (x, y, w, h) = (results['left'][i], results['top'][i], results['width'][i], results['height'][i])
         if conf > confidence and text == words[0]:
-            print(f"found {words[0]} at {x},{y} {w}x{h}")
+            logging.debug(f"found {words[0]} at {x},{y} {w}x{h}")
             loc = [(x, y, w, h)]
             if len(words) == 1:  # just one word
                 return get_box_from_set(loc)
@@ -290,10 +355,10 @@ def find_words(words, results, confidence=90, max_dist=50):
                         results['left'][j], results['top'][j], results['width'][j], results['height'][j])
                     if conf > confidence and text == word:
                         if get_box_dist(x, y, w, h, x2, y2) < max_dist:   # w2, h2 not used
-                            print(f"found {word} at {x2},{y2} {w2}x{h2}")
+                            logging.debug(f"found {word} at {x2},{y2} {w2}x{h2}")
                             loc.append((x2, y2, w2, h2))
                             if len(loc) == len(words):
-                                print("Found all words")
+                                logging.debug("Found all words")
                                 return get_box_from_set(loc)
     return None
 
@@ -310,11 +375,17 @@ if __name__ == '__main__':
     test()
 
 
-def is_text_on_screen(words, region=None, debug=False):
+def get_screen_width():
+    image = get_cv_screenshot()
+    logging.debug(f"Screen shape: {image.shape}")
+    return image.shape
+
+
+def is_text_on_screen(words, region=None, debug=False, save="", show=False):
     image = get_cv_screenshot(region)
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-    results = recognise(gray_image, confidence=51, debug=debug, save=True, show=True)
+    results = recognise(gray_image, confidence=51, debug=debug, save=len(save) > 0, show=True, save_suffix=save)
     res = find_words(words, results)
     if res is None: return False, None
     return True, res
@@ -330,8 +401,21 @@ def capture_debug():
 # Work in progresss ....
 def capture_all_images():
     check_for_tesseract_exe()
-    if not capture_carrier_services(): return
-    if not capture_inventory_and_transfer(): return
-    a, b = capture_carrier_management_and_tritium_depot()
-    if a is None: return
+    capture_carrier_services()
+
+
+def after_capture_carrier_services(*args):
+    capture_inventory_and_transfer()
+
+
+def after_capture_inventory(*args):
+    capture_carrier_management_and_tritium_depot()
+
+
+def after_capture_carrier_management(*args):
+    if len(args) == 0 or args[0] is None: return
+    capture_navigation()
+
+
+def after_capture_navigation(*args):
     fcmacros.set_status("Saved images .... ")
