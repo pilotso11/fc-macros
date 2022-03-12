@@ -395,16 +395,29 @@ def load_tritium_1(*args):
     root.after(100, load_tritium_2, *args)
 
 
-def load_tritium_2(*args):
-    b, tritium_loc = ocr.is_text_on_screen(["TRITIUM"], debug=True, show=False, save="tritium")
-    tritium_region = [tritium_loc[0]-20, tritium_loc[1], tritium_loc[2]-tritium_loc[0]+40, tritium_loc[3]-tritium_loc[1]]
+def press_until_selected_text(key, words, alt_key_if_words_not_found, max_cnt=10):
     cnt = 0
-    while cnt < 10:
-        if ocr.get_average_color_bw(tritium_region) > 128:
+    while True:
+        cnt += 1
+        if cnt >= max_cnt: return False
+        b, loc = ocr.is_text_on_screen(words, debug=True, show=False, save=words[0])
+        if not b:
+            press(alt_key_if_words_not_found)
+        else:
             break
-        press(ED_UI_UP)
+    region = [loc[0]-20, loc[1], loc[2]-loc[0]+40, loc[3]-loc[1]]
+    cnt = 0
+    while cnt < max_cnt:
+        if ocr.get_average_color_bw(region) > 128:
+            break
+        press(key)
         cnt += 1
     if cnt >= 10: return False
+    return True
+
+
+def load_tritium_2(*args):
+    if not press_until_selected_text(ED_UI_UP, ["TRITIUM"], ED_UI_DOWN): return False
 
     # hold down the ED_UI_LEFT key until max capacity is reached
     kb.press(ED_UI_LEFT)
@@ -420,7 +433,7 @@ def load_tritium_2(*args):
 
 
 def load_tritium_3(*args):
-    if not press_and_find(ED_UI_DOWN, 'cancel'): return False
+    if not press_until_selected_text(ED_UI_DOWN, ["CANCEL"], ED_UI_UP): return False
     press(ED_UI_RIGHT)
     press(ED_UI_SELECT)
     set_status('tritium loaded')
@@ -469,7 +482,7 @@ def empty_cargo():
     press(ED_UI_UP)
     if not press_and_find(ED_UI_RIGHT, 'transfer'): return False
     press(ED_UI_SELECT)
-    if not press_and_find(ED_UI_UP, 'all_to_carrier'): return False
+    if not press_until_selected_text(ED_UI_UP, ["TRANSFER", "ALL"], ED_UI_DOWN): return False
     press(ED_UI_SELECT)
     sleep(1)
     press(ED_UI_SELECT)
