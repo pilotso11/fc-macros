@@ -425,11 +425,16 @@ def check_for_tesseract_exe():
 if __name__ == '__main__':
     check_for_tesseract_exe()
     test()
-    #capture_carrier_services()
-    #capture_inventory_and_transfer()
-    #capture_carrier_management_and_tritium_depot()
 
 
+# Capture the screen and ORR it, show the results
+def capture_debug():
+    check_for_tesseract_exe()
+    test()
+
+
+# Capture all needed images
+# Work in progresss ....
 def capture_all_images():
     check_for_tesseract_exe()
     if not capture_carrier_services(): return

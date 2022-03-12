@@ -268,7 +268,7 @@ def schedule_jump():
 
 
 # Macro to schedule a jump
-def find_system_and_jump():
+def find_system_and_jump(*args):
     global jumping, jump_one
 
     # Check E:D still has the focus
@@ -285,12 +285,16 @@ def find_system_and_jump():
         return False
 
     if do_refuel.get() == 1:
-        if not load_tritium(): return False
-        if not donate_tritium(): return False
-        if not load_tritium(): return False
+        new_args = [donate_tritium, load_tritium, find_system_and_jump_1]
+        for a in args: new_args.append(a)
+        if not load_tritium(*new_args): return False
+    else:
+        root.after(100, find_system_and_jump_1, *args)
 
+
+def find_system_and_jump_1(*args):
+    global jumping, jump_one
     if jump_one: jump_one = False
-
     set_status('Finding next waypoint')
 
     # Back to main menu
@@ -305,8 +309,11 @@ def find_system_and_jump():
     sleep(0.5)
     if not press_and_find(ED_UI_DOWN, 'open_galmap'): return False
     press(ED_UI_SELECT)
-    sleep(3)
+    root.after(3000, find_system_and_jump_2, *args)
 
+
+def find_system_and_jump_2(*args):
+    global jumping, jump_one
     pos = locate_on_screen('search_the_galaxy')
     if pos is None:
         set_status("Unable to find search")
@@ -328,7 +335,7 @@ def find_system_and_jump():
 
     if not press_and_find(ED_BACK, "carrier_services"): return False
     press(ED_UI_SELECT)
-    return True
+    call_next_args(100, *args)
 
 
 # Callback to refuel the ship, the carrier and then the ship
@@ -337,24 +344,30 @@ def refuel():
     if not get_current_focus(): return
     set_status('Refueling')
     sleep(1)
-    if not load_tritium(): return
-    if not donate_tritium(): return
-    if not load_tritium(): return  # keep fully loaded to reduce tritium consumption
+    if not load_tritium(donate_tritium): return
 
 
 # Refill ship with tritium
-def load_tritium():
+def load_tritium(*args):
     # Check E:D still has the focus
     if not get_current_focus(): return False
 
     set_status('Filling ship with tritium')
     if not press_and_find(ED_BACK, "carrier_services"): return False
     press(ED_RIGHT_WINDOW, 0.5)
+    root.after(100, load_tritium_1, *args)
+
+
+def load_tritium_1(*args):
     if not press_and_find(ED_MENU_RIGHT, 'inventory'): return False
     press(ED_UI_RIGHT)
     press(ED_UI_UP)
     if not press_and_find(ED_UI_RIGHT, 'transfer'): return False
     press(ED_UI_SELECT)
+    root.after(100, load_tritium_2, *args)
+
+
+def load_tritium_2(*args):
     if not press_and_find(ED_UI_UP, 'tritium'): return False
 
     # hold down the ED_UI_LEFT key until max capacity is reached
@@ -365,18 +378,29 @@ def load_tritium():
     logging.debug(f"max_capacity found")
     logging.debug(f"Release {ED_UI_LEFT}")
     kb.release(ED_UI_LEFT)
+    root.after(100, load_tritium_3, *args)
 
+
+def load_tritium_3(*args):
     if not press_and_find(ED_UI_DOWN, 'cancel'): return False
     press(ED_UI_RIGHT)
     press(ED_UI_SELECT)
     set_status('tritium loaded')
     if not press_and_find(ED_BACK, "carrier_services"): return False
+    call_next_args(100, *args)
 
-    return True
+
+def call_next_args(delay_ms=100, *args):
+    if len(args) > 0:
+        if len(args) > 1:
+            new_args = args[1:]
+            root.after(delay_ms, args[0], *new_args)
+        else:
+            root.after(delay_ms, args[0])
 
 
 # Donate tritium
-def donate_tritium():
+def donate_tritium(*args):
     set_status('Donating tritium')
     if not press_and_find(ED_BACK, "carrier_services"): return False
     press(ED_UI_SELECT)
@@ -392,7 +416,7 @@ def donate_tritium():
     press(ED_UI_SELECT)
     if not press_and_find(ED_BACK, "carrier_services"): return False
 
-    return True
+    call_next_args(100, *args)
 
 
 def empty_cargo():
@@ -723,6 +747,8 @@ def check_keys():
     if kb.is_pressed('ctrl+f2'):
         ocr.capture_all_images()
         return
+    if kb.is_pressed('Ctrl+F3'):
+        ocr.capture_debug()
 
     root.after(20, check_keys)
 
