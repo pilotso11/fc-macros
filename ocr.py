@@ -318,12 +318,13 @@ def find_words(words, results, confidence=90, max_dist=50):
                 return get_box_from_set(loc)
 
             for word in words[1:]:
+                logging.debug(f"Looking for {word}")
                 for j in range(len(results['text'])):
                     conf = float(results['conf'][j])
                     text = results['text'][j]
                     (x2, y2, w2, h2) = (
                         results['left'][j], results['top'][j], results['width'][j], results['height'][j])
-                    if conf > confidence and text == word:
+                    if conf > confidence and text[:len(word)] == word:
                         if get_box_dist(x, y, w, h, x2, y2) < max_dist:   # w2, h2 not used
                             logging.debug(f"found {word} at {x2},{y2} {w2}x{h2}")
                             loc.append((x2, y2, w2, h2))
@@ -357,7 +358,7 @@ def is_text_on_screen_list(words_list, region=None, debug=False, save="", show=F
 
     results = recognise(gray_image, confidence=51, debug=debug, save=len(save) > 0, show=True, save_suffix=save)
     for words in words_list:
-        res = find_words(words, results)
+        res = find_words(words, results, confidence=51)
         if res is not None:
             logging.debug(f"Found {words} at {res}")
             return True, res
@@ -369,8 +370,8 @@ def is_text_on_screen(words, region=None, debug=False, save="", show=False):
     image = get_cv_screenshot(region)
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-    results = recognise(gray_image, confidence=51, debug=debug, save=len(save) > 0, show=True, save_suffix=save)
-    res = find_words(words, results)
+    results = recognise(gray_image, confidence=51, debug=debug, save=len(save) > 0, show=show, save_suffix=save)
+    res = find_words(words, results, confidence=51)
     if res is None: return False, None
     return True, res
 

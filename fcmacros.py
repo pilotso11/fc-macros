@@ -134,7 +134,7 @@ def get_current_focus():
 # This is almost certainly wrong
 # @TODO: Work out how to scale when the screen is not an equal of 1080x1920
 def region_scale(region):
-    ratio = screen_shape / 1080
+    ratio = screen_shape[0] / 1080
     new_region = []
     for r in region:
         new_region.append(r * ratio)
@@ -212,7 +212,7 @@ def get_matching_images(image):
 # if not, press the key specified, true this up to max_trues times,
 # if max_tries is exceeded return False
 # confidence is the confidence interval on the match
-def press_and_find(key=ED_UI_LEFT, image='tritium', max_tries=10, do_log=True):
+def press_and_find(key, image, max_tries=10, do_log=True):
     image_set = get_matching_images(image)
     grayscale = settings.grayscale == 1
     confidence = settings.confidence / 100.0
@@ -240,7 +240,7 @@ def press_and_find_text_list(key, words_list, region=None, max_tries=10):
 
 
 # Locate an image(set) on the screen, return its found position
-def locate_on_screen(image='tritium', do_log=True):
+def locate_on_screen(image, do_log=True):
     image_set = get_matching_images(image)
 
     grayscale = settings.grayscale == 1
@@ -396,12 +396,22 @@ def load_tritium_1(*args):
 
 
 def load_tritium_2(*args):
-    if not press_and_find(ED_UI_UP, 'tritium'): return False
+    b, tritium_loc = ocr.is_text_on_screen(["TRITIUM"], debug=True, show=False, save="tritium")
+    tritium_region = [tritium_loc[0]-20, tritium_loc[1], tritium_loc[2]-tritium_loc[0]+40, tritium_loc[3]-tritium_loc[1]]
+    cnt = 0
+    while cnt < 10:
+        if ocr.get_average_color_bw(tritium_region) > 128:
+            break
+        press(ED_UI_UP)
+        cnt += 1
+    if cnt >= 10: return False
 
     # hold down the ED_UI_LEFT key until max capacity is reached
     kb.press(ED_UI_LEFT)
     logging.debug(f"Press and hold {ED_UI_LEFT}")
-    while not ocr.is_text_on_screen(["MAX", "CAPACITY"], region_scale(MAX_CAPACITY_POS), debug=True, save='max_capacity', show=False) and locate_on_screen('max_capacity') is None:
+    while True:
+        res, loc = ocr.is_text_on_screen(["MAX", "CAPACITY"], debug=True, save='max_capacity', show=False)
+        if res: break
         sleep(0.5)
     logging.debug(f"max_capacity found")
     logging.debug(f"Release {ED_UI_LEFT}")
