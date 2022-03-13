@@ -130,5 +130,12 @@ dmypy.json
 
 # The Tesseract unzipped install
 /Tesseract-OCR/
-/test_route.csv
 /awthemes-10.4.0/
+
+# Testing/Debugging files
+/debugimages/
+/test/
+/test_route.csv
+
+# Pycharm files
+.idea/
