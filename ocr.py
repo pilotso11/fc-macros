@@ -9,7 +9,6 @@ from locations import *
 import logging
 import glob
 import zipfile
-import keyboard as kb
 
 # Teserect installer for windows
 # https://github.com/UB-Mannheim/tesseract/wiki
@@ -44,94 +43,37 @@ def get_and_save_cv_screenshot(file, x, y, x2, y2):
     return image
 
 
-def capture_navigation(debug=False):
-    fcmacros.set_to_carrier()
-    fcmacros.press_and_find(ED_UI_DOWN, "tritium_depot")
-    fcmacros.press_and_find(ED_UI_RIGHT, "carrier_management")
-    fcmacros.press(ED_UI_SELECT)
-    sleep(1)
-    fcmacros.press(ED_UI_DOWN)
-    sleep(1)
-    part = get_and_save_cv_screenshot_region('images/navigation99.png', NAVIGATION_IMAGE)
-    if debug:
-        cv2.imshow('navigation', part)
-    fcmacros.set_status('Saved navigation99.png')
-    fcmacros.press(ED_UI_SELECT)
-    fcmacros.root.after(1000, capture_navigation_2, debug)
-
-
-def capture_navigation_2(*args):
-    debug = args[0]
-    part = get_and_save_cv_screenshot_region('images/open_galmap99.png', GALMAP_IMAGE)
-    if debug:
-        cv2.imshow('open_galmap', part)
-    fcmacros.set_status('Saved open_galmap99.png')
-    fcmacros.press(ED_UI_SELECT)
-    fcmacros.root.after(2000, capture_navigation_3, debug)
-
-
-def capture_navigation_3(*args):
-    debug = args[0]
-    part = get_and_save_cv_screenshot_region('images/search_the_galaxy99.png', GALMAP_SEARCH)
-    if debug:
-        cv2.imshow('search_the_galaxy', part)
-    fcmacros.set_status('Saved search_the_galaxy99.png')
-    fcmacros.mouse_click_at(GALMAP_SEARCH[0]+GALMAP_SEARCH[1]//2, GALMAP_SEARCH[1]+GALMAP_SEARCH[3]//2)
-    kb.write("SOL")
-    sleep(1.5)
-    part = get_and_save_cv_screenshot_region('images/search_go_to99.png', GO_TO_LOCATION_POS)
-    if debug:
-        cv2.imshow('search_the_galaxy', part)
-    fcmacros.mouse_click_at(GO_TO_LOCATION_POS[0]+GO_TO_LOCATION_POS[1]//2, GO_TO_LOCATION_POS[1]+GO_TO_LOCATION_POS[3]//2)
-
+def get_carrier_services_loc():
+    cnt = 0
+    while not fcmacros.get_current_focus():
+        cnt += 1
+        fcmacros.set_status(f'Looking for E:D {cnt}')
+        if cnt > 5:
+            fcmacros.set_status(f'E:D Does not have focus, aborting')
+            return None
+        sleep(2)
     fcmacros.press(ED_BACK)
     fcmacros.press(ED_BACK)
-    fcmacros.press(ED_BACK)
-    fcmacros.root.after(1000, after_capture_navigation, debug)
-
-
-# Screencap CARRIER MANAGEMENT selected
-def capture_carrier_management_and_tritium_depot(debug=False):
-    fcmacros.set_to_carrier()
-    fcmacros.root.after(5000, capture_carrier_management_and_tritium_depot_1, debug)
-
-
-def capture_carrier_management_and_tritium_depot_1(*args):
-    debug = args[0]
-    image = get_cv_screenshot()
-    gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    results = recognise(gray_image)
-    mid_cm = find_words(["CARRIER", "MANAGEMENT"], results)
-    mid_td = find_words(["TRITIUM", "DEPOT"], results)
-    if mid_cm is None:
-        logging.warning("Didn't find CARRIER MANAGEMENT")
-        fcmacros.set_status("Didn't find CARRIER MANAGEMENT")
-        return None, None
-    if mid_td is None:
-        logging.warning("Didn't find TRITIUM DEPOT")
-        fcmacros.set_status("Didn't find TRITIUM DEPOT")
-        return None, None
-    carrier_services_loc = mid_cm
-    tritium_depot_loc = mid_td
-    fcmacros.press(ED_UI_DOWN)
-    fcmacros.press(ED_UI_DOWN)
-    # on TRITIUM DEPOT
-    x, y, x2, y2 = tritium_depot_loc[0], tritium_depot_loc[1], tritium_depot_loc[2], tritium_depot_loc[3]
-    part = get_and_save_cv_screenshot('images/tritium_depot99.png', x, y, x2, y2)
-    if debug:
-        cv2.imshow('depot', part)
-    fcmacros.set_status('Saved tritium_depot99.png')
-    fcmacros.press(ED_UI_RIGHT)
-    fcmacros.press(ED_UI_RIGHT)
-    # Carrier Services is selected
-    x, y, x2, y2 = carrier_services_loc[0], carrier_services_loc[1], carrier_services_loc[2], carrier_services_loc[3]
-    part = get_and_save_cv_screenshot('images/carrier_management99.png', x, y, x2, y2)
-    if debug:
-        cv2.imshow('carrier management', part)
-        cv2.waitKey(0)
-    fcmacros.set_status('Saved carrier_management99.png')
-    fcmacros.press(ED_BACK)
-    fcmacros.root.after(100, after_capture_carrier_management, mid_cm, mid_td)
+    cnt = 0
+    while True:
+        image = get_cv_screenshot()
+        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        results = recognise(gray_image)
+        mid_al = find_words(["AUTO", "LAUNCH"], results)
+        mid_cs = find_words(["CARRIER", "SERVICES"], results)
+        if mid_cs is None and mid_al is not None:
+            logging.debug(f"Found AUTO LAUNCH at {mid_al}")
+            fcmacros.press(ED_UI_DOWN, delay=0.5)
+        else:
+            if mid_cs is not None:
+                logging.debug(f"Found CARRIER SERVICES at {mid_cs}")
+                return mid_cs
+            else:
+                fcmacros.press(ED_UI_UP, delay=0.5)
+        cnt += 1
+        if cnt > 5:
+            logging.warning("Unable to find CARRIER SERVICES after 5 loops, aborting.")
+            return None
 
 
 # Screencap CARRIER SERVICES selected
@@ -170,7 +112,7 @@ def capture_carrier_services(debug=False):
                 if debug:
                     cv2.imshow('screencap', part)
                     cv2.waitKey(0)
-                fcmacros.root.after(100, after_capture_carrier_services)
+                fcmacros.root.after(100, after_carrier_services)
                 return True
             else:
                 fcmacros.press(ED_UI_UP, delay=0.5)
@@ -223,7 +165,7 @@ def recognise(image, debug=False, show=False, save=False, confidence=80, save_su
             cv2.waitKey(0)
             cv2.destroyAllWindows()
         if save:
-            cv2.imwrite(f'debug_{save_suffix}.png', image)
+            cv2.imwrite(f'images/debug_{save_suffix}.png', image)
 
     return details
 
@@ -325,30 +267,33 @@ def is_text_on_screen(words, region=None, debug=False, save="", show=False):
     return True, res
 
 
-def get_average_color(region):
+def get_average_color(region, debug_text=""):
     image = get_cv_screenshot(region)
     avg_color_per_row = np.average(image, axis=0)
     avg_color = np.average(avg_color_per_row, axis=0)
-    logging.debug(f"Average color at {region} is {avg_color}")
+    logging.debug(f"Average color for {debug_text} at {region} is {avg_color}")
     return avg_color
 
 
-def get_average_color_gray(region):
+def get_average_color_gray(region, debug_text=""):
     image = get_cv_screenshot(region)
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     avg_color_per_row = np.average(gray_image, axis=0)
     avg_color = np.average(avg_color_per_row, axis=0)
-    logging.debug(f"Average color at {region} is {avg_color}")
+    logging.debug(f"Average color for {debug_text} at {region} is {avg_color}")
     return avg_color
 
 
-def get_average_color_bw(region):
+def get_average_color_bw(region, debug_text=""):
     image = get_cv_screenshot(region)
+    cv2.imwrite(f'images/debug_{debug_text}_color.png', image)
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    cv2.imwrite(f'images/debug_{debug_text}_gray.png', gray_image)
     gray_image = cv2.threshold(gray_image, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+    cv2.imwrite(f'images/debug_{debug_text}_thresh.png', gray_image)
     avg_color_per_row = np.average(gray_image, axis=0)
     avg_color = np.average(avg_color_per_row, axis=0)
-    logging.debug(f"Average color at {region} is {avg_color}")
+    logging.debug(f"Average color for {debug_text} at {region} is {avg_color}")
     return avg_color
 
 
@@ -365,20 +310,11 @@ def capture_all_images():
     capture_carrier_services()
 
 
-def after_capture_carrier_services(*args):
-    capture_carrier_management_and_tritium_depot()
-
-
-def after_capture_carrier_management(*args):
-    if len(args) == 0 or args[0] is None: return
-    capture_navigation()
-
-
-def after_capture_navigation(*args):
+def after_carrier_services(*args):
     fcmacros.set_status("Saved images .... ")
 
 
 def is_fullscreen():
-    val = get_average_color_bw(WINDOW_TEST) <= 128
+    val = get_average_color_bw(WINDOW_TEST) <= ENABLED_THRESHOLD
     logging.debug(f"Fullscreen={val}")
     return val

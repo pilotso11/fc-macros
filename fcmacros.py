@@ -39,6 +39,7 @@ route_file = ""
 is_odyssey = False
 screen_shape = [1080, 1920, 3]
 fullscreen = False
+carrier_services_loc = None
 
 # initialize settings
 settings = usersettings.Settings('com.ed.fcmacros')
@@ -121,6 +122,7 @@ def get_latest_log_file():
 
 
 def get_current_focus():
+    global screen_shape, fullscreen
     logging.debug("Checking window focus before running macro")
     win = win32gui.GetForegroundWindow()
     title = win32gui.GetWindowText(win)
@@ -129,6 +131,7 @@ def get_current_focus():
         set_status("Elite - Dangerous does not have the focus, aborting")
         return False
     logging.debug("Elite - Dangerous has the focus, macro proceeding")
+    screen_shape = ocr.get_screen_width()
     fullscreen = ocr.is_fullscreen()
     return True
 
@@ -204,11 +207,11 @@ def get_matching_images(image):
 # if not, press the key specified, true this up to max_trues times,
 # if max_tries is exceeded return False
 # confidence is the confidence interval on the match
-def press_and_find(key, image, max_tries=10, do_log=True):
+def deprecated_press_and_find(key, image, max_tries=10, do_log=True):
     image_set = get_matching_images(image)
     grayscale = settings.grayscale == 1
     confidence = settings.confidence / 100.0
-    return press_and_find_set(key, image_set, max_tries, confidence, grayscale, do_log)
+    return deprecated_press_and_find_set(key, image_set, max_tries, confidence, grayscale, do_log)
 
 
 # look for words on screen , if found, return True
@@ -217,7 +220,6 @@ def press_and_find(key, image, max_tries=10, do_log=True):
 def press_and_find_text(key, words, region=None, max_tries=10):
     while max_tries >= 0:
         max_tries -= 1
-        if region is not None: region = offset(region)
         found, where = ocr.is_text_on_screen(words, region=region)
         if found:
             return True
@@ -229,7 +231,6 @@ def press_and_find_text(key, words, region=None, max_tries=10):
 def press_and_find_text_list(key, words_list, region=None, max_tries=10):
     while max_tries >= 0:
         max_tries -= 1
-        if region is not None: region = offset(region)
         found, where = ocr.is_text_on_screen_list(words_list, region=region)
         if found:
             return True
@@ -238,22 +239,45 @@ def press_and_find_text_list(key, words_list, region=None, max_tries=10):
 
 
 # Press a key until the indicated region is highlighted
-def press_until_selected_region(key, region, max_count=10):
+def press_until_selected_region(key, region, debug_text, max_count=10):
+    logging.info(f"Selecting region {debug_text} at {region}")
     while max_count >= 0:
         max_count -= 1
-        if ocr.get_average_color_bw(offset(region)) > 128: return True
+        if ocr.get_average_color_bw(region, debug_text=debug_text) > ENABLED_THRESHOLD: return True
         press(key)
     return False
 
 
-def offset(region):
-    if fullscreen:
-        region[1] += FULLSCREEN_OFFSET
-    return region
+# Search for any of a set of text on the screen
+# If not found, press key
+# Repeat
+def press_until_text_found(key, word_list, max_count=10):
+    while max_count > 0:
+        b, res = ocr.is_text_on_screen_list(word_list)
+        if b:
+            logging.debug(f"Found Words {res}")
+            return True
+        press(key)
+        max_count -= 1
+        sleep(0.5)
+    return False
+
+
+# Return to the center HUD
+def return_hud_to_start():
+    if not press_until_text_found(ED_BACK, [["CARRIER", "SERVICES"], ["AUTO", "LAUNCH"]], max_count=10):
+        set_status("Unable to find main HUD")
+        return False
+    if ocr.get_average_color_bw(get_carrier_services_location(), debug_text="CARRIER SERVICES") > ENABLED_THRESHOLD:
+        return True
+    press(ED_UI_DOWN)
+    press(ED_UI_DOWN)
+    press(ED_UI_DOWN)
+    return press_until_selected_region(ED_UI_UP, get_carrier_services_location(), debug_text="CARRIER SERVICES", max_count=5)
 
 
 # Locate an image(set) on the screen, return its found position
-def locate_on_screen(image, do_log=True):
+def deprecated_locate_on_screen(image, do_log=True):
     image_set = get_matching_images(image)
 
     grayscale = settings.grayscale == 1
@@ -272,7 +296,7 @@ def locate_on_screen_set(images=None, confidence=0.75, grayscale=False, do_log=T
     return None
 
 
-def press_and_find_set(key=ED_UI_LEFT, images=None, max_tries=10, confidence=0.75, grayscale=False, do_log=True):
+def deprecated_press_and_find_set(key=ED_UI_LEFT, images=None, max_tries=10, confidence=0.75, grayscale=False, do_log=True):
     if images is None:
         images = []
     cnt = 0
@@ -290,6 +314,18 @@ def press_and_find_set(key=ED_UI_LEFT, images=None, max_tries=10, confidence=0.7
             return False
 
 
+def mouse_move_to_region(region, x_offset=0, y_offset=0):
+    x = region[0] + region[2]//2 + x_offset
+    y = region[1] + region[3]//2 + y_offset
+    pyautogui.moveTo(x, y)
+
+
+def mouse_click_at_region(region, pause=0.25, click_duration=0.25, x_offset=0, y_offset=0):
+    x = region[0] + region[2]//2 + x_offset
+    y = region[1] + region[3]//2 + y_offset
+    mouse_click_at(x, y, pause=pause, click_duration=click_duration)
+
+
 def mouse_click_at(x, y, pause=0.25, click_duration=0.25):
     pyautogui.moveTo(x, y)
     sleep(pause)
@@ -298,15 +334,38 @@ def mouse_click_at(x, y, pause=0.25, click_duration=0.25):
     pyautogui.mouseUp()
 
 
+def get_carrier_services_location():
+    global carrier_services_loc
+    if carrier_services_loc is not None:
+        return carrier_services_loc
+
+    carrier_services_loc = ocr.get_carrier_services_loc()
+    if carrier_services_loc is None:
+        set_status("Unable to find CARRIER SERVICES")
+        return None
+
+    new_loc = (carrier_services_loc[0], carrier_services_loc[1],
+               carrier_services_loc[2]-carrier_services_loc[0],
+               carrier_services_loc[3] - carrier_services_loc[1])
+    carrier_services_loc = new_loc
+    logging.info(f"Found CARRIER SERVICES at {new_loc}")
+
+    return carrier_services_loc
+
+
 # Move back to the carrier main screen after a jump
-def set_to_carrier():
+def reset_to_main_hud_after_jump():
     sleep(5)
     logging.debug("Select right HUD (workaround)")
-    if not press_and_find_text_list(ED_RIGHT_WINDOW, [["MODULES"], ["STATUS"], ["FIRE", "GROUPS"]]): return False
+    if not press_and_find_text_list(ED_RIGHT_WINDOW, [["MODULES"], ["STATUS"], ["FIRE", "GROUPS"]]):
+        set_status("Unable to verify right HUD - cant find MODULES, STATUS or FIRE GROUPS")
+        return False
     sleep(1)
     logging.debug("Back to center HUD")
-    if not press_and_find(ED_BACK, "carrier_services"): return False
-    press(ED_UI_SELECT)
+    if not return_hud_to_start(): return False
+    if ocr.get_average_color_bw(get_carrier_services_location(), debug_text="CARRIER SERVICES") <= ENABLED_THRESHOLD:
+        set_status("Unable to find selected CARRIER SERVICES")
+        return False
 
 
 # Callback to schedule a jump
@@ -334,7 +393,7 @@ def find_system_and_jump(*args):
     if do_refuel.get() == 1:
         new_args = [donate_tritium, load_tritium, find_system_and_jump_1]
         for a in args: new_args.append(a)
-        if not load_tritium(*new_args): return False
+        load_tritium(*new_args)
     else:
         root.after(100, find_system_and_jump_1, *args)
 
@@ -345,38 +404,43 @@ def find_system_and_jump_1(*args):
     set_status('Finding next waypoint')
 
     # Back to main menu
-    if not press_and_find(ED_BACK, "carrier_services"): return False
+    if not return_hud_to_start(): return False
     press(ED_UI_SELECT)
-    if not press_and_find(ED_UI_DOWN, 'tritium_depot'): return False
-    if not press_and_find(ED_UI_RIGHT, "carrier_management"): return False
+
+    if not press_until_selected_text(ED_UI_DOWN, ['TRITIUM', 'DEPOT'], ED_UI_UP): return False
+    if not press_until_selected_text(ED_UI_RIGHT, ['CARRIER', 'MANAGEMENT'], ED_UI_DOWN): return False
     press(ED_UI_SELECT)
     sleep(2)
-    if not press_and_find(ED_UI_DOWN, 'navigation'): return False
+    if not press_until_selected_region(ED_UI_DOWN, NAVIGATION_ICON, debug_text="NAVIGATION ICON", max_count=5):
+        set_status("Unable to select NAVIGATION ICON")
+        return False
     press(ED_UI_SELECT)
     sleep(0.5)
-    if not press_and_find(ED_UI_DOWN, 'open_galmap'): return False
+    if not press_until_selected_region(ED_UI_DOWN, GALMAP_IMAGE, debug_text="OPEN GALMAP", max_count=5):
+        set_status("Unable to SELECT OPEN GALMAP")
+        return False
     press(ED_UI_SELECT)
     root.after(3000, find_system_and_jump_2, *args)
 
 
 def find_system_and_jump_2(*args):
     global jumping, jump_one
-    pos = locate_on_screen('search_the_galaxy')
-    if pos is None:
-        set_status("Unable to find search")
-        return False
-    x, y = pos.left + pos.width // 2, pos.top + pos.height // 2
-    mouse_click_at(x, y)
+    mouse_click_at_region(GALMAP_SEARCH)
     kb.write(next_waypoint)
     sleep(1)
-    mouse_click_at(x, y + pos.height)
+    mouse_click_at_region(GALMAP_SEARCH, y_offset=GALMAP_SEARCH[3])
     sleep(2)
-    x, y = SET_CARRIER_DESTINATION_POS[0] + SET_CARRIER_DESTINATION_POS[2]//2, SET_CARRIER_DESTINATION_POS[1] + SET_CARRIER_DESTINATION_POS[3]//2
-    mouse_click_at(x, y)
+    mouse_move_to_region(SET_CARRIER_DESTINATION_POS)
+    sleep(0.25)
+    # Check if set carrier destination is selectable
+    if ocr.get_average_color_bw(SET_CARRIER_DESTINATION_POS) <= ENABLED_THRESHOLD:
+        set_status("Destination is invalid")
+        return
+    mouse_click_at_region(SET_CARRIER_DESTINATION_POS)
     set_status("Jump set for {}".format(next_waypoint))
     jumping = True
 
-    if not press_and_find(ED_BACK, "carrier_services"): return False
+    if not return_hud_to_start(): return False
     press(ED_UI_SELECT)
     call_next_args(100, *args)
 
@@ -396,25 +460,37 @@ def load_tritium(*args):
     if not get_current_focus(): return False
 
     set_status('Filling ship with tritium')
-    if not press_and_find(ED_BACK, "carrier_services"): return False
+    if not return_hud_to_start(): return False
     press(ED_RIGHT_WINDOW, 0.5)
     root.after(100, load_tritium_1, *args)
 
 
 def load_tritium_1(*args):
-    if not press_until_selected_region(ED_MENU_RIGHT, INVENTORY_POS): return False
-    press(ED_UI_RIGHT)
-    press(ED_UI_UP)
-    press_until_selected_region(ED_UI_RIGHT, TRANSFER_POS)
+    if not press_until_selected_region(ED_MENU_RIGHT, INVENTORY_POS, debug_text="INVENTORY", max_count=15):
+        set_status("Unable to select INVENTORY")
+        return False
+    if not press_until_selected_region(ED_UI_RIGHT, TRANSFER_POS, debug_text="TRANSFER", max_count=5):
+        press(ED_UI_UP)
+        sleep(0.5)
+        press(ED_UI_UP)
+        if not press_until_selected_region(ED_UI_RIGHT, TRANSFER_POS, debug_text="TRANSFER"):
+            set_status("Unable to select TRANSFER")
+            return False
     press(ED_UI_SELECT)
     root.after(100, load_tritium_2, *args)
 
 
+# Find the select words on the screen  (bounding box)
+# Press key until the words are selectable
+# If the Words are not found, press the alt_key_if_words_not_found
+# Retry both operations up to max_Cnt
 def press_until_selected_text(key, words, alt_key_if_words_not_found, max_cnt=10):
     cnt = 0
     while True:
         cnt += 1
-        if cnt >= max_cnt: return False
+        if cnt >= max_cnt:
+            logging.warning(f"Unable to find words for selection: {words}")
+            return False
         b, loc = ocr.is_text_on_screen(words, debug=True, show=False, save=words[0])
         if not b:
             press(alt_key_if_words_not_found)
@@ -423,11 +499,13 @@ def press_until_selected_text(key, words, alt_key_if_words_not_found, max_cnt=10
     region = [loc[0]-20, loc[1], loc[2]-loc[0]+40, loc[3]-loc[1]]
     cnt = 0
     while cnt < max_cnt:
-        if ocr.get_average_color_bw(region) > 128:
+        if ocr.get_average_color_bw(region) > ENABLED_THRESHOLD:
             break
         press(key)
         cnt += 1
-    if cnt >= 10: return False
+    if cnt >= max_cnt:
+        logging.debug(f"Unable to find selected text: {words} at: {region}")
+        return False
     return True
 
 
@@ -452,7 +530,7 @@ def load_tritium_3(*args):
     press(ED_UI_RIGHT)
     press(ED_UI_SELECT)
     set_status('tritium loaded')
-    if not press_and_find(ED_BACK, "carrier_services"): return False
+    if not return_hud_to_start(): return False
     call_next_args(100, *args)
 
 
@@ -468,19 +546,21 @@ def call_next_args(delay_ms=100, *args):
 # Donate tritium
 def donate_tritium(*args):
     set_status('Donating tritium')
-    if not press_and_find(ED_BACK, "carrier_services"): return False
+    if not return_hud_to_start(): return False
     press(ED_UI_SELECT)
-    if not press_and_find(ED_UI_DOWN, 'tritium_depot'): return False
+
+    if not press_until_selected_text(ED_UI_DOWN, ['TRITIUM', 'DEPOT'], ED_UI_UP): return False
     press(ED_UI_SELECT)
     sleep(0.5)
-    if not press_until_selected_region(ED_UI_UP, DONATE_TRITIUM_POS): return False
+    if not press_until_selected_region(ED_UI_UP, DONATE_TRITIUM_POS, debug_text="DONATE TRITIUM"): return False
     press(ED_UI_SELECT)
-    if not press_until_selected_region(ED_UI_UP, CONFIRM_DEPOSIT_POS): return False
+    if not press_until_selected_region(ED_UI_UP, CONFIRM_DEPOSIT_POS, debug_text="CONFIRM DEPOSIT"): return False
     press(ED_UI_SELECT)
     set_status('tritium donated')
-    if not press_until_selected_region(ED_UI_DOWN, TRITIUM_EXIT): return False
+    if not press_until_selected_region(ED_UI_DOWN, TRITIUM_EXIT, debug_text="EXIT DOOR"): return False
     press(ED_UI_SELECT)
-    if not press_and_find(ED_BACK, "carrier_services"): return False
+
+    return_hud_to_start()
 
     call_next_args(100, *args)
 
@@ -490,21 +570,23 @@ def empty_cargo():
     if not get_current_focus(): return False
 
     set_status('Emptying your cargo hold')
-    if not press_and_find(ED_BACK, "carrier_services"): return False
+    if not return_hud_to_start(): return False
+
     press(ED_RIGHT_WINDOW, 0.5)
-    if not press_until_selected_region(ED_MENU_RIGHT, INVENTORY_POS): return False
+    if not press_until_selected_region(ED_MENU_RIGHT, INVENTORY_POS, max_count=15, debug_text="INVENTORY"): return False
     press(ED_UI_RIGHT)
     press(ED_UI_RIGHT)
     press(ED_UI_UP)
     press(ED_UI_UP)
-    if not press_until_selected_region(ED_UI_RIGHT, TRANSFER_POS): return False
+    if not press_until_selected_region(ED_UI_RIGHT, TRANSFER_POS, debug_text="TRANSFER"): return False
     press(ED_UI_SELECT)
-    if not press_until_selected_text(ED_UI_UP, ["TRANSFER", "ALL"], ED_UI_DOWN): return False
+    if not press_until_selected_text(ED_UI_UP, ["TO", "CARRIER"], ED_UI_DOWN): return False
     press(ED_UI_SELECT)
     sleep(1)
     press(ED_UI_SELECT)
     set_status('Cargo hold emptied')
-    if not press_and_find(ED_BACK, "carrier_services"): return False
+
+    return_hud_to_start()
 
 
 # Select route file dialog
@@ -623,13 +705,6 @@ def setup_ui():
 
     ttk.Label(frame, text="Engage next jump on route:").grid(column=0, row=row, sticky="e")
     ttk.Label(frame, text="Ctrl+F9").grid(column=1, row=row, sticky="w")
-    row += 1
-
-    ttk.Separator(frame, orient="horizontal").grid(column=0, row=row, columnspan=5, sticky="ew")
-    row += 1
-
-    ttk.Label(frame, text="Setup Beta: Capture some images (CARRIER SERVICES, CARRIER MANAGEMENT, INVENTORY ... see docs)").grid(column=0, row=row, columnspan=3, sticky="e")
-    ttk.Label(frame, text="Ctrl+F2").grid(column=3, row=row, sticky="w")
     row += 1
 
     ttk.Separator(frame, orient="horizontal").grid(column=0, row=row, columnspan=5, sticky="ew")
@@ -762,7 +837,9 @@ def process_log():
                     jumping = False
                     cool_down = True
                     root.after(1000 * 210, cool_down_complete)
-                    set_to_carrier()
+                    reset_to_main_hud_after_jump()
+                    # and into the CARRIER SERVICES
+                    press(ED_UI_SELECT)
 
                 set_status("Current system: " + current_system)
                 system_label.config(text=current_system)
@@ -812,12 +889,12 @@ def check_keys():
         set_status("Auto jump disabled")
         auto_jump = False
         auto_jump_label.config(text="")
-    if kb.is_pressed('ctrl+f2'):
-        ocr.capture_all_images()
+        root.after(1000, check_keys)
         return
     if kb.is_pressed('Ctrl+F3'):
         ocr.capture_debug()
-
+        root.after(5000, check_keys)
+        return
     root.after(20, check_keys)
 
 
@@ -837,7 +914,6 @@ def run_main():
     ui_started = True
     log_setup()
     check_for_themes()
-    screen_shape = ocr.get_screen_width()
     run_ui()
 
 
