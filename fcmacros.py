@@ -288,8 +288,10 @@ def mouse_click_at(x, y, pause=0.25, click_duration=0.25):
 # Move back to the carrier main screen after a jump
 def set_to_carrier():
     sleep(5)
+    logging.debug("Select right HUD (workaround)")
     if not press_and_find_text_list(ED_RIGHT_WINDOW, [["MODULES"], ["STATUS"], ["FIRE", "GROUPS"]]): return False
     sleep(1)
+    logging.debug("Back to center HUD")
     if not press_and_find(ED_BACK, "carrier_services"): return False
     press(ED_UI_SELECT)
 
@@ -386,11 +388,20 @@ def load_tritium(*args):
     root.after(100, load_tritium_1, *args)
 
 
+# Press a key until the indicated region is highlighted
+def press_until_selected_region(key, region, max_count=10):
+    while max_count >= 0:
+        max_count -= 1
+        if ocr.get_average_color_bw(region) > 128: return True
+        press(key)
+    return False
+
+
 def load_tritium_1(*args):
-    if not press_and_find(ED_MENU_RIGHT, 'inventory'): return False
+    if not press_until_selected_region(ED_MENU_RIGHT, INVENTORY_POS): return False
     press(ED_UI_RIGHT)
     press(ED_UI_UP)
-    if not press_and_find(ED_UI_RIGHT, 'transfer'): return False
+    press_until_selected_region(ED_UI_RIGHT, TRANSFER_POS)
     press(ED_UI_SELECT)
     root.after(100, load_tritium_2, *args)
 
@@ -477,10 +488,12 @@ def empty_cargo():
     set_status('Emptying your cargo hold')
     if not press_and_find(ED_BACK, "carrier_services"): return False
     press(ED_RIGHT_WINDOW, 0.5)
-    if not press_and_find(ED_MENU_RIGHT, 'inventory'): return False
+    if not press_until_selected_region(ED_MENU_RIGHT, INVENTORY_POS): return False
+    press(ED_UI_RIGHT)
     press(ED_UI_RIGHT)
     press(ED_UI_UP)
-    if not press_and_find(ED_UI_RIGHT, 'transfer'): return False
+    press(ED_UI_UP)
+    if not press_until_selected_region(ED_UI_RIGHT, TRANSFER_POS): return False
     press(ED_UI_SELECT)
     if not press_until_selected_text(ED_UI_UP, ["TRANSFER", "ALL"], ED_UI_DOWN): return False
     press(ED_UI_SELECT)

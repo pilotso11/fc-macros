@@ -139,50 +139,13 @@ def capture_carrier_management_and_tritium_depot_1(*args):
     fcmacros.press(ED_UI_RIGHT)
     # Carrier Services is selected
     x, y, x2, y2 = carrier_services_loc[0], carrier_services_loc[1], carrier_services_loc[2], carrier_services_loc[3]
-    part = get_and_save_cv_screenshot('images/carrier_management9.png', x, y, x2, y2)
+    part = get_and_save_cv_screenshot('images/carrier_management99.png', x, y, x2, y2)
     if debug:
         cv2.imshow('carrier management', part)
         cv2.waitKey(0)
     fcmacros.set_status('Saved carrier_management99.png')
     fcmacros.press(ED_BACK)
     fcmacros.root.after(100, after_capture_carrier_management, mid_cm, mid_td)
-
-
-# Screencap selected INVENTORY menu
-def capture_inventory_and_transfer(debug=False):
-    cnt = 0
-    while not fcmacros.get_current_focus():
-        cnt += 1
-        fcmacros.set_status(f'Looking for E:D {cnt}')
-        if cnt > 5:
-            fcmacros.set_status(f'E:D Does not have focus, aborting')
-            return False
-        sleep(2)
-
-    fcmacros.press(ED_RIGHT_WINDOW)
-    sleep(1)
-    while True:
-        if get_average_color_bw(INVENTORY_POS) > 128:
-            part = get_and_save_cv_screenshot_region('images/inventory99.png', INVENTORY_POS)
-            if debug:
-                cv2.imshow('inventory', part)
-            fcmacros.press(ED_UI_RIGHT)
-            fcmacros.press(ED_UI_RIGHT)
-            if get_average_color_bw(TRANSFER_POS) <= 128:
-                fcmacros.press(ED_UI_UP)
-                fcmacros.press(ED_UI_RIGHT)
-            if get_average_color_bw(TRANSFER_POS) > 128:
-                part = get_and_save_cv_screenshot_region('images/transfer99.png', TRANSFER_POS)
-                if debug:
-                    cv2.imshow('transfer', part)
-                fcmacros.set_status('Saved inventory99.png and transfer99.png')
-                fcmacros.root.after(100, after_capture_inventory)
-            else:
-                fcmacros.set_status("Unable to find selected transfer")
-
-            return
-        else:
-            fcmacros.press(ED_MENU_RIGHT)
 
 
 # Screencap CARRIER SERVICES selected
@@ -417,10 +380,6 @@ def capture_all_images():
 
 
 def after_capture_carrier_services(*args):
-    capture_inventory_and_transfer()
-
-
-def after_capture_inventory(*args):
     capture_carrier_management_and_tritium_depot()
 
 
