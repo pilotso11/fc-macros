@@ -87,21 +87,7 @@ def capture_navigation_3(*args):
     fcmacros.press(ED_BACK)
     fcmacros.press(ED_BACK)
     fcmacros.press(ED_BACK)
-    fcmacros.root.after(1000, capture_navigation_4, debug)
-
-
-def capture_navigation_4(*args):
-    debug = args[0]
-    fcmacros.press_and_find(ED_UI_DOWN, "tritium_depot")
-    fcmacros.press(ED_UI_SELECT)
-    sleep(1)
-    fcmacros.press(ED_UI_DOWN)
-    part = get_and_save_cv_screenshot_region('images/exit_door99.png', TRITIUM_EXIT)
-    if debug:
-        cv2.imshow('exit door', part)
-    fcmacros.set_status('Saved exit_door99.png')
-    fcmacros.press(ED_UI_SELECT)
-    fcmacros.root.after(100, after_capture_navigation)
+    fcmacros.root.after(1000, after_capture_navigation, debug)
 
 
 # Screencap CARRIER MANAGEMENT selected
@@ -390,3 +376,9 @@ def after_capture_carrier_management(*args):
 
 def after_capture_navigation(*args):
     fcmacros.set_status("Saved images .... ")
+
+
+def is_fullscreen():
+    val = get_average_color_bw(WINDOW_TEST) <= 128
+    logging.debug(f"Fullscreen={val}")
+    return val

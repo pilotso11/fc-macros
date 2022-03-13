@@ -1,3 +1,5 @@
+# Offset to adjust for menubar missing on fullscreen
+FULLSCREEN_OFFSET = -10
 # Known locations
 # for screen captures
 MAX_CAPACITY_POS = [685, 350, 125, 50]
@@ -10,3 +12,6 @@ INVENTORY_POS = [1135, 265, 130, 30]
 TRANSFER_POS = [1480, 325, 115, 20]
 SET_CARRIER_DESTINATION_POS = [1420, 400, 330, 60]
 GO_TO_LOCATION_POS = [1204, 124, 25, 25]
+WINDOW_TEST = [635, 0, 100, 10]
+DONATE_TRITIUM_POS = [870, 860, 190, 35]
+CONFIRM_DEPOSIT_POS = [850, 830, 225, 25]

@@ -37,7 +37,8 @@ route = []
 next_waypoint = ''
 route_file = ""
 is_odyssey = False
-screen_shape = 1080
+screen_shape = [1080, 1920, 3]
+fullscreen = False
 
 # initialize settings
 settings = usersettings.Settings('com.ed.fcmacros')
@@ -128,17 +129,8 @@ def get_current_focus():
         set_status("Elite - Dangerous does not have the focus, aborting")
         return False
     logging.debug("Elite - Dangerous has the focus, macro proceeding")
+    fullscreen = ocr.is_fullscreen()
     return True
-
-
-# This is almost certainly wrong
-# @TODO: Work out how to scale when the screen is not an equal of 1080x1920
-def region_scale(region):
-    ratio = screen_shape[0] / 1080
-    new_region = []
-    for r in region:
-        new_region.append(r * ratio)
-    return new_region
 
 
 # Load and parse the route.csv
@@ -219,9 +211,13 @@ def press_and_find(key, image, max_tries=10, do_log=True):
     return press_and_find_set(key, image_set, max_tries, confidence, grayscale, do_log)
 
 
+# look for words on screen , if found, return True
+# if not, press the key specified, true this up to max_trues times,
+# if max_tries is exceeded return False
 def press_and_find_text(key, words, region=None, max_tries=10):
     while max_tries >= 0:
         max_tries -= 1
+        if region is not None: region = offset(region)
         found, where = ocr.is_text_on_screen(words, region=region)
         if found:
             return True
@@ -229,14 +225,31 @@ def press_and_find_text(key, words, region=None, max_tries=10):
     return False
 
 
+# As above, but for a list of a list of words - used to validate the right HUD is selected
 def press_and_find_text_list(key, words_list, region=None, max_tries=10):
     while max_tries >= 0:
         max_tries -= 1
+        if region is not None: region = offset(region)
         found, where = ocr.is_text_on_screen_list(words_list, region=region)
         if found:
             return True
         press(key)
     return False
+
+
+# Press a key until the indicated region is highlighted
+def press_until_selected_region(key, region, max_count=10):
+    while max_count >= 0:
+        max_count -= 1
+        if ocr.get_average_color_bw(offset(region)) > 128: return True
+        press(key)
+    return False
+
+
+def offset(region):
+    if fullscreen:
+        region[1] += FULLSCREEN_OFFSET
+    return region
 
 
 # Locate an image(set) on the screen, return its found position
@@ -388,15 +401,6 @@ def load_tritium(*args):
     root.after(100, load_tritium_1, *args)
 
 
-# Press a key until the indicated region is highlighted
-def press_until_selected_region(key, region, max_count=10):
-    while max_count >= 0:
-        max_count -= 1
-        if ocr.get_average_color_bw(region) > 128: return True
-        press(key)
-    return False
-
-
 def load_tritium_1(*args):
     if not press_until_selected_region(ED_MENU_RIGHT, INVENTORY_POS): return False
     press(ED_UI_RIGHT)
@@ -469,12 +473,12 @@ def donate_tritium(*args):
     if not press_and_find(ED_UI_DOWN, 'tritium_depot'): return False
     press(ED_UI_SELECT)
     sleep(0.5)
-    if not press_and_find(ED_UI_UP, 'donate_tritium'): return False
+    if not press_until_selected_region(ED_UI_UP, DONATE_TRITIUM_POS): return False
     press(ED_UI_SELECT)
-    if not press_and_find(ED_UI_UP, 'confirm_deposit'): return False
+    if not press_until_selected_region(ED_UI_UP, CONFIRM_DEPOSIT_POS): return False
     press(ED_UI_SELECT)
     set_status('tritium donated')
-    if not press_and_find(ED_UI_DOWN, 'exit_door'): return False
+    if not press_until_selected_region(ED_UI_DOWN, TRITIUM_EXIT): return False
     press(ED_UI_SELECT)
     if not press_and_find(ED_BACK, "carrier_services"): return False
 
