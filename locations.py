@@ -1,6 +1,10 @@
 # Offset to adjust for menubar missing on fullscreen
 FULLSCREEN_OFFSET = -10
+WINDOW_TEST = [635, 0, 100, 10]  # Location to test for window border
+
+# Color depth threshold for selected
 ENABLED_THRESHOLD = 128
+
 # Known locations
 # for screen captures
 MAX_CAPACITY_POS = [685, 350, 125, 50]
@@ -13,6 +17,25 @@ INVENTORY_POS = [1135, 265, 150, 30]
 TRANSFER_POS = [1475, 320, 125, 35]
 SET_CARRIER_DESTINATION_POS = [1420, 400, 330, 60]
 GO_TO_LOCATION_POS = [1204, 124, 25, 25]
-WINDOW_TEST = [635, 0, 100, 10]
 DONATE_TRITIUM_POS = [870, 860, 190, 35]
 CONFIRM_DEPOSIT_POS = [850, 830, 225, 25]
+
+is_adjusted_for_fullscreen = False
+
+
+def adjust_for_fullscreen():
+    global is_adjusted_for_fullscreen
+    if is_adjusted_for_fullscreen: return
+    is_adjusted_for_fullscreen = True
+    MAX_CAPACITY_POS[1] += FULLSCREEN_OFFSET
+    NAVIGATION_ICON[1] += FULLSCREEN_OFFSET
+    NAVIGATION_IMAGE[1] += FULLSCREEN_OFFSET
+    GALMAP_IMAGE[1] += FULLSCREEN_OFFSET
+    GALMAP_SEARCH[1] += FULLSCREEN_OFFSET
+    TRITIUM_EXIT[1] += FULLSCREEN_OFFSET
+    INVENTORY_POS[1] += FULLSCREEN_OFFSET
+    TRANSFER_POS[1] += FULLSCREEN_OFFSET
+    SET_CARRIER_DESTINATION_POS[1] += FULLSCREEN_OFFSET
+    GO_TO_LOCATION_POS[1] += FULLSCREEN_OFFSET
+    DONATE_TRITIUM_POS[1] += FULLSCREEN_OFFSET
+    CONFIRM_DEPOSIT_POS[1] += FULLSCREEN_OFFSET

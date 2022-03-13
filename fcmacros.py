@@ -14,6 +14,8 @@ import getpass
 import os
 import usersettings
 import webbrowser
+
+import locations
 import ocr
 from keymaps import *
 from locations import *
@@ -133,6 +135,8 @@ def get_current_focus():
     logging.debug("Elite - Dangerous has the focus, macro proceeding")
     screen_shape = ocr.get_screen_width()
     fullscreen = ocr.is_fullscreen()
+    if fullscreen: adjust_for_fullscreen()
+
     return True
 
 
