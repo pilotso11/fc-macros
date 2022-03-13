@@ -17,30 +17,21 @@ Route files are in CSV format from the spansh router.  Only the first column mat
 Currently, this plugin uses default keybindings and mouse for input.  The mouse is used to navigate the galmap.
 Because it uses the keyboard and mouse, it is unlikely to work with a joystick or HOTAS enabled.
 
-Note: See _keymaps.py_ to edit the keboard mappings.  (Only in source coude version.)
+Note: See _keymaps.py_ to edit the keyboard mappings.  (Only in source code version.)
 
-It is also unlikely work with custom HUD colors as it uses image
-matching to verify its screen navigation.  If the macro cannot find the expected 
-ative
-user input it will abort for safety.
+The latest version no longer uses image matching, instead of uses known location on the screen
+and text recognition.  It may now work with custom HUD colors.  It is also hopefully insensitive
+to HUD Brightness options.    It is also tested on both windowed and full screen modes, but only at 1008p full screen.
 
-Because the HUD sizes are different on some ships, this may cause issues.  
-In particular the size of the "Carrier Services" UI button varies.
-Several different images are used to try and combat this. 
-It has been tested on the most likely to be used ships:
-* Imperial Cutter
-* Anaconda
-* Python
-* Type 9
-* Beluga
-
-You can add your own images if needed in addition to the ones supplied. 
-To do so, take a screenshot, clip out just the button (you can see the existing images in the images/ folder).
-Save this image in the images/ folder and make sure it is named "image-#.png".
+The tool is written attempting for safety in the UI.  
+If the macro cannot find the expected images or text it will abort for safety. 
+But I cannot guarantee it won't misbehave in some odd way.  It is just sending keys and mouse
+actions so if E:D loses focus while running it will start sending them to whatever application does have the focus.
 
 If you use the refuel option, make sure your ship has enough room for a full jumps worth of Tritium, 
 as much as 150 Tons if your carrier is fully loaded.   This option will load the carrier and the ship before 
 setting up a jump to minimize the carrier mass.
+
 
 ---------------
 
@@ -53,46 +44,62 @@ Option 1:
 
 Option 2:
 * Download the source
-* pip install keyboard pyautogui pillow opencv-python usersettings pywin32
+* pip install keyboard pyautogui pillow opencv-python usersettings pywin32 pytesseract
   * Or run "setup.cmd"
-* python fcmacros.py
+* python main.py
 
------------------
+
+--------------
+# 3rd Party Dependencies
+
+These are all included in the installation or are part of the pip install in setup.cmd.
+
+The latest edition uses teseract for the text recognition.  
+A portable copy is provided in a zip file and is auto extracted at first runtime.   
+More about the teseract project can be found [here](https://github.com/tesseract-ocr/tesseract/blob/main/doc/tesseract.1.asc).
+The provided copy is the [University of Manheim 64bit build.](https://github.com/UB-Mannheim/tesseract/wiki)  
+
+There is heavy use of [OpenCV](https://opencv.org/).  
+
+The latest version uses much less of [pyautogui](https://pyautogui.readthedocs.io/en/latest/)
+But much homage is owed to this tool.
+
+The UI theme is [awthemes awdark](https://sourceforge.net/projects/tcl-awthemes/) by Brad Lanam. (Thank you.)
+
+--------------
 
 # Troubleshooting
 
 Summary of actions are written to "fcmacros.log" in the working directory.
 If you are experiencing issues, enable debug logging.  The log file will contain
 details of every step the macro is taking - what keypresses it is making, 
-the images it is searching for on the screen etc.   Hopefully there will be enough
-information to trouble shoot.
+the images or text it is searching for on the screen etc.   Hopefully there will be enough
+information to troubleshoot.   For now it saves many debug_*.png images in the debugimages/ folder. 
+These are to also help troubleshoot problems.   You might see something like debug_TRITIUM_threshold.png. 
+If it doesn't contain the word "TRITIUM", that's a hint that it's not finding the text properly.
 
 Likely causes:
-* The image matching is screen resolution and colour specific.  If you're not running E:D at 1080p the images may not match.
-* Custom HUD colours will break the image matching.
-* Non-standard keybindings can also be a problem.
-* Try running in windowed mode if you are in full-screen mode.  Alt-Enter to switch modes.
-* Try using the default UI brightness.
-* You can also try reducing the image matching confidence from the default value of 75.
-* Look at some of the suggestions in the thread on issue report number 2: https://github.com/pilotso11/fc-macros/issues/2 
-
-If image matching is an issue, you can try replacing the images with your own cropped screenshots.
+* The image matching is screen resolution specific.  If you're not running E:D at 1080p the image locations are probably wrong.
+It should be possible to make them scale, but some experimentation is needed with different resolutions,
+especially those that are at different aspect ratios.
+* Custom HUD colours may be a problem, though hopefully not in the latest version.  If for some reason
+your colour palette is very bright or very dim, it might make it difficult to find what button is selected as the
+image is forced to a very high contrast.
+* As with the above, you might try using the default UI brightness.
+* Non-standard keybindings can also be a problem.  
+* Try running in windowed mode if you are in full-screen mode.  Alt-Enter to switch modes.  This also should be 
+working properly on the latest version in both modes, but its worth a try.
+* Look at some of the suggestions in the thread on issue report number 2: https://github.com/pilotso11/fc-macros/issues/2
+though these are less relevent with the latest releases.
 
 If you have the source code version you can edit the keybindings in "keymaps.py".
 
 # Work in progress
 
-* Automatic setup by capturing the images for matching.  
+The latest version has abandoned the pyautogui "find this image" technique and instead
+uses known offsets and text recognition.  This should be less trouble free.
 
-As of 0.1.5 (only from source code at the moment),
-Ctrl-F2 will run the UI and capture images for 
-  * *CARRIER SERVICES*
-  * *CARRIER MANAGEMENT*
-  * *INVENTORY*  (Selected and unselected)
-  * *TRANSFER*
-  * *TRITIUM DEPOT*
-
-Images are saved to the images/ folder with ID's of 99.
+More work is needed to support non-1080p resolutions.
 
 -----------------
 

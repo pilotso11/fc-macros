@@ -1,3 +1,4 @@
+# Copyright (c) 2022 Seth Osher
 # These are the default keybindings
 # Change these if you have non standard settings
 # See also https://github.com/boppreh/keyboard/blob/master/keyboard/_canonical_names.py

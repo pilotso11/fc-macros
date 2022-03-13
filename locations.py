@@ -1,3 +1,4 @@
+# Copyright (c) 2022 Seth Osher
 # Offset to adjust for menubar missing on fullscreen
 FULLSCREEN_OFFSET = -10
 WINDOW_TEST = [635, 0, 100, 10]  # Location to test for window border

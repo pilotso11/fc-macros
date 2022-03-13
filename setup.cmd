@@ -1,1 +1,1 @@
-pip install keyboard pyautogui pillow opencv-python usersettings pywin32
+pip install keyboard pyautogui pillow opencv-python usersettings pywin32 pytesseract

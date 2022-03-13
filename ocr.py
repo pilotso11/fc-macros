@@ -1,3 +1,7 @@
+# Copyright (c) 2022 Seth Osher
+# OCR and Screen Image detection for fcmacros
+import os
+
 import cv2
 import pyautogui
 import pytesseract
@@ -165,7 +169,7 @@ def recognise(image, debug=False, show=False, save=False, confidence=80, save_su
             cv2.waitKey(0)
             cv2.destroyAllWindows()
         if save:
-            cv2.imwrite(f'images/debug_{save_suffix}.png', image)
+            cv2.imwrite(f'debugimages/debug_{save_suffix}.png', image)
 
     return details
 
@@ -239,7 +243,7 @@ if __name__ == '__main__':
 
 def get_screen_width():
     image = get_cv_screenshot()
-    logging.debug(f"Screen shape: {image.shape}")
+    logging.info(f"Screen shape: {image.shape}")
     return image.shape
 
 
@@ -247,7 +251,7 @@ def is_text_on_screen_list(words_list, region=None, debug=False, save="", show=F
     image = get_cv_screenshot(region)
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-    results = recognise(gray_image, confidence=51, debug=debug, save=len(save) > 0, show=True, save_suffix=save)
+    results = recognise(gray_image, confidence=51, debug=debug, save=len(save) > 0, show=show, save_suffix=save)
     for words in words_list:
         res = find_words(words, results, confidence=51)
         if res is not None:
@@ -286,11 +290,11 @@ def get_average_color_gray(region, debug_text=""):
 
 def get_average_color_bw(region, debug_text=""):
     image = get_cv_screenshot(region)
-    cv2.imwrite(f'images/debug_{debug_text}_color.png', image)
+    cv2.imwrite(f'debugimages/debug_{debug_text}_color.png', image)
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    cv2.imwrite(f'images/debug_{debug_text}_gray.png', gray_image)
+    cv2.imwrite(f'debugimages/debug_{debug_text}_gray.png', gray_image)
     gray_image = cv2.threshold(gray_image, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-    cv2.imwrite(f'images/debug_{debug_text}_thresh.png', gray_image)
+    cv2.imwrite(f'debugimages/debug_{debug_text}_thresh.png', gray_image)
     avg_color_per_row = np.average(gray_image, axis=0)
     avg_color = np.average(avg_color_per_row, axis=0)
     logging.debug(f"Average color for {debug_text} at {region} is {avg_color}")
@@ -315,6 +319,11 @@ def after_carrier_services(*args):
 
 
 def is_fullscreen():
+    f = glob.glob("debugimages")
+    if len(f) == 0:
+        os.mkdir("debugimages")
+        logging.info("Created debugimages folder")
+
     val = get_average_color_bw(WINDOW_TEST) <= ENABLED_THRESHOLD
-    logging.debug(f"Fullscreen={val}")
+    logging.info(f"Fullscreen={val}")
     return val

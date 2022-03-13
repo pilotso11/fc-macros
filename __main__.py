@@ -1,3 +1,5 @@
+# Copyright (c) 2022 Seth Osher
+# Main launch for fcmacros running via pyinstaller
 from fcmacros import run_main
 
 

@@ -14,8 +14,6 @@ import getpass
 import os
 import usersettings
 import webbrowser
-
-import locations
 import ocr
 from keymaps import *
 from locations import *
@@ -25,7 +23,7 @@ import sys
 import win32gui
 import zipfile
 
-VERSION = "0.1.6"
+VERSION = "0.2.1"
 BUNDLED = False
 LOGFILE = "fcmacros.log"
 
@@ -749,9 +747,9 @@ def setup_ui():
 
     ttk.Label(frame, text="Debug Log?").grid(column=0, row=row, sticky="e")
     ttk.Checkbutton(frame, variable=DEBUG).grid(column=1, row=row, sticky="w")
-    ttk.Label(frame, text="Image matching confidence?").grid(column=2, row=row, sticky="e")
+    # ttk.Label(frame, text="Image matching confidence?").grid(column=2, row=row, sticky="e")
     # ttk.Checkbutton(frame, variable=GRAYSCALE).grid(column=3, row=row, sticky="w")
-    ttk.Spinbox(frame, from_=10, to=90, textvariable=CONFIDENCE).grid(column=3, row=row, sticky="e")
+    # ttk.Spinbox(frame, from_=10, to=90, textvariable=CONFIDENCE).grid(column=3, row=row, sticky="e")
 
     row += 1
     ttk.Label(frame, text="Version " + VERSION).grid(column=0, row=row, sticky="w")
@@ -918,6 +916,7 @@ def run_main():
     ui_started = True
     log_setup()
     check_for_themes()
+    ocr.check_for_tesseract_exe()
     run_ui()
 
 
