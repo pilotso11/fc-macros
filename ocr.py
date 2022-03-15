@@ -63,14 +63,14 @@ def get_carrier_services_loc():
         image = get_cv_screenshot()
         gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         results = recognise(gray_image)
-        mid_al = find_words(["AUTO", "LAUNCH"], results)
+        mid_al = find_words(["LAUNCH"], results)
         mid_cs = find_words(["CARRIER", "SERVICES"], results)
         if mid_cs is None and mid_al is not None:
-            logging.debug(f"Found AUTO LAUNCH at {mid_al}")
+            logging.debug(f"Found LAUNCH at {mid_al}")
             fcmacros.press(ED_UI_DOWN, delay=0.5)
         else:
             if mid_cs is not None:
-                logging.debug(f"Found CARRIER SERVICES at {mid_cs}")
+                logging.info(f"Found CARRIER SERVICES at {mid_cs}")
                 return mid_cs
             else:
                 fcmacros.press(ED_UI_UP, delay=0.5)
@@ -97,10 +97,10 @@ def capture_carrier_services(debug=False):
         image = get_cv_screenshot()
         gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         results = recognise(gray_image)
-        mid_al = find_words(["AUTO", "LAUNCH"], results)
+        mid_al = find_words(["LAUNCH"], results)
         mid_cs = find_words(["CARRIER", "SERVICES"], results)
         if mid_cs is None and mid_al is not None:
-            logging.debug(f"Found AUTO LAUNCH at {mid_al}")
+            logging.debug(f"Found LAUNCH at {mid_al}")
             fcmacros.press(ED_UI_DOWN, delay=0.5)
         else:
             if mid_cs is not None:
@@ -311,7 +311,7 @@ def capture_debug():
 # Work in progresss ....
 def capture_all_images():
     check_for_tesseract_exe()
-    capture_carrier_services()
+    # capture_carrier_services()
 
 
 def after_carrier_services(*args):

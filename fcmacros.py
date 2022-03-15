@@ -23,7 +23,7 @@ import sys
 import win32gui
 import zipfile
 
-VERSION = "0.2.1"
+VERSION = "0.2.2"
 BUNDLED = False
 LOGFILE = "fcmacros.log"
 
@@ -33,6 +33,7 @@ jumping = False
 cool_down = False
 auto_jump = False
 jump_one = False
+ship = ''
 route = []
 next_waypoint = ''
 route_file = ""
@@ -170,7 +171,7 @@ def load_route(route_file_name):
 
 
 # Press down key for down_time and wait after for delay
-def press(key, delay=0.75, down_time=0.2):
+def press(key, delay=0.5, down_time=0.2):
     if key == '\b':
         out = "Press: backspace"
     elif key == '\t':
@@ -253,7 +254,7 @@ def press_until_selected_region(key, region, debug_text, max_count=10):
 # Search for any of a set of text on the screen
 # If not found, press key
 # Repeat
-def press_until_text_found(key, word_list, max_count=10):
+def press_until_text_found(key, word_list, max_count=10, pause=0.5):
     while max_count > 0:
         b, res = ocr.is_text_on_screen_list(word_list)
         if b:
@@ -261,21 +262,21 @@ def press_until_text_found(key, word_list, max_count=10):
             return True
         press(key)
         max_count -= 1
-        sleep(0.5)
+        sleep(pause)
     return False
 
 
 # Return to the center HUD
 def return_hud_to_start():
-    if not press_until_text_found(ED_BACK, [["CARRIER", "SERVICES"], ["AUTO", "LAUNCH"]], max_count=10):
+    if not press_until_text_found(ED_BACK, [["LAUNCH"], ["AUTO"], ["DISEMBARK"], ["CARRIER", "SERVICES"]], max_count=10):
         set_status("Unable to find main HUD")
         return False
     if ocr.get_average_color_bw(get_carrier_services_location(), debug_text="CARRIER SERVICES") > ENABLED_THRESHOLD:
         return True
-    press(ED_UI_DOWN)
-    press(ED_UI_DOWN)
-    press(ED_UI_DOWN)
-    return press_until_selected_region(ED_UI_UP, get_carrier_services_location(), debug_text="CARRIER SERVICES", max_count=5)
+    press(ED_UI_UP)
+    press(ED_UI_UP)
+    press(ED_UI_UP)
+    return press_until_selected_region(ED_UI_DOWN, get_carrier_services_location(), debug_text="CARRIER SERVICES", max_count=5)
 
 
 # Locate an image(set) on the screen, return its found position
@@ -339,6 +340,12 @@ def mouse_click_at(x, y, pause=0.25, click_duration=0.25):
 def get_carrier_services_location():
     global carrier_services_loc
     if carrier_services_loc is not None:
+        return carrier_services_loc
+
+    if ship in carrier_services_locations.keys():
+        loc = carrier_services_locations[ship]
+        carrier_services_loc = (loc[0]-10, loc[1]-3, loc[2]+20, loc[3]+6)
+        logging.info(f'Found know carrier services location for {ship} at {carrier_services_loc}')
         return carrier_services_loc
 
     carrier_services_loc = ocr.get_carrier_services_loc()
@@ -409,10 +416,10 @@ def find_system_and_jump_1(*args):
     if not return_hud_to_start(): return False
     press(ED_UI_SELECT)
 
-    if not press_until_selected_text(ED_UI_DOWN, ['TRITIUM', 'DEPOT'], ED_UI_UP): return False
-    if not press_until_selected_text(ED_UI_RIGHT, ['CARRIER', 'MANAGEMENT'], ED_UI_DOWN): return False
+    if not press_until_selected_region(ED_UI_DOWN, TRITIUM_DEPOT_POS, ED_UI_UP): return False
+    if not press_until_selected_region(ED_UI_RIGHT, CARRIER_MANAGEMENT_POS, ED_UI_DOWN): return False
     press(ED_UI_SELECT)
-    sleep(2)
+    sleep(1)
     if not press_until_selected_region(ED_UI_DOWN, NAVIGATION_ICON, debug_text="NAVIGATION ICON", max_count=5):
         set_status("Unable to select NAVIGATION ICON")
         return False
@@ -452,7 +459,6 @@ def find_system_and_jump_2(*args):
 def refuel():
     if not get_current_focus(): return
     set_status('Refueling')
-    sleep(1)
     if not load_tritium(donate_tritium): return
 
 
@@ -518,9 +524,9 @@ def load_tritium_2(*args):
     kb.press(ED_UI_LEFT)
     logging.debug(f"Press and hold {ED_UI_LEFT}")
     while True:
-        res, loc = ocr.is_text_on_screen(["MAX", "CAPACITY"], debug=True, save='max_capacity', show=False)
+        res, loc = ocr.is_text_on_screen(["MAX", "CAPACITY"], region=MAX_CAPACITY_POS, debug=True, save='max_capacity', show=False)
         if res: break
-        sleep(0.5)
+        sleep(0.3)
     logging.debug(f"max_capacity found")
     logging.debug(f"Release {ED_UI_LEFT}")
     kb.release(ED_UI_LEFT)
@@ -528,7 +534,7 @@ def load_tritium_2(*args):
 
 
 def load_tritium_3(*args):
-    if not press_until_selected_text(ED_UI_DOWN, ["CANCEL"], ED_UI_UP): return False
+    if not press_until_selected_region(ED_UI_DOWN, TRANSFER_CANCEL_POS, ED_UI_UP): return False
     press(ED_UI_RIGHT)
     press(ED_UI_SELECT)
     set_status('tritium loaded')
@@ -551,7 +557,7 @@ def donate_tritium(*args):
     if not return_hud_to_start(): return False
     press(ED_UI_SELECT)
 
-    if not press_until_selected_text(ED_UI_DOWN, ['TRITIUM', 'DEPOT'], ED_UI_UP): return False
+    if not press_until_selected_region(ED_UI_DOWN, TRITIUM_DEPOT_POS, ED_UI_UP): return False
     press(ED_UI_SELECT)
     sleep(0.5)
     if not press_until_selected_region(ED_UI_UP, DONATE_TRITIUM_POS, debug_text="DONATE TRITIUM"): return False
@@ -584,7 +590,7 @@ def empty_cargo():
     press(ED_UI_SELECT)
     if not press_until_selected_text(ED_UI_UP, ["TO", "CARRIER"], ED_UI_DOWN): return False
     press(ED_UI_SELECT)
-    sleep(1)
+    sleep(0.5)
     press(ED_UI_SELECT)
     set_status('Cargo hold emptied')
 
@@ -810,17 +816,18 @@ def check_newer_log():
 
 
 def process_log():
-    global current_system, jumping, cool_down, is_odyssey
+    global current_system, jumping, cool_down, is_odyssey, ship, carrier_services_loc
     try:
         lines = ed_log.readlines()
         if len(lines) > 0:
             logging.debug(f"Got {len(lines)} lines from E:D log")
-        curr_sys = ''
+        new_system = ''
+        new_ship = ''
         for line in lines:
             line = line.strip()
             # logging.debug(line)
             if line.count('StarSystem') > 0:
-                curr_sys = line
+                new_system = get_value_from_log_line(line, 'StarSystem')
             if line.count('Odyssey') > 0:
                 ody = get_value_from_log_line(line, 'Odyssey')
                 if ody == "true":
@@ -830,23 +837,30 @@ def process_log():
                 dest = get_value_from_log_line(line, 'SystemName')
                 if dest == next_waypoint:
                     set_status("Jump to {} confirmed".format(dest))
+            if line.count('event":"Loadout') > 0:
+                new_ship = get_value_from_log_line(line, 'Ship')
 
-        if curr_sys > '':
-            new_system = curr_sys.split('"StarSystem":"')[1].split('"')[0]
-            if current_system != new_system:
-                current_system = new_system
-                if jumping:
-                    jumping = False
-                    cool_down = True
-                    root.after(1000 * 210, cool_down_complete)
-                    reset_to_main_hud_after_jump()
-                    # and into the CARRIER SERVICES
-                    press(ED_UI_SELECT)
+        # Process last ship
+        if '' < new_ship != ship:
+            ship = new_ship
+            carrier_services_loc = None
+            logging.info(f"Current ship is '{ship}'")
 
-                set_status("Current system: " + current_system)
-                system_label.config(text=current_system)
-                update_route_position()
-                root.update_idletasks()
+        # Process last system
+        if '' < new_system != current_system:
+            current_system = new_system
+            if jumping:
+                jumping = False
+                cool_down = True
+                root.after(1000 * 210, cool_down_complete)
+                reset_to_main_hud_after_jump()
+                # and into the CARRIER SERVICES
+                press(ED_UI_SELECT)
+
+            set_status("Current system: " + current_system)
+            system_label.config(text=current_system)
+            update_route_position()
+            root.update_idletasks()
 
     except (UnicodeDecodeError, ) as err:
         logging.warning(f"Exception processing log file: {err}")
