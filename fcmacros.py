@@ -23,7 +23,7 @@ import sys
 import win32gui
 import zipfile
 
-VERSION = "0.2.2"
+VERSION = "0.2.3"
 BUNDLED = False
 LOGFILE = "fcmacros.log"
 
@@ -419,7 +419,7 @@ def find_system_and_jump_1(*args):
     if not press_until_selected_region(ED_UI_DOWN, TRITIUM_DEPOT_POS, ED_UI_UP): return False
     if not press_until_selected_region(ED_UI_RIGHT, CARRIER_MANAGEMENT_POS, ED_UI_DOWN): return False
     press(ED_UI_SELECT)
-    sleep(1)
+    sleep(5)  # Wait for galmap, sometimes slow
     if not press_until_selected_region(ED_UI_DOWN, NAVIGATION_ICON, debug_text="NAVIGATION ICON", max_count=5):
         set_status("Unable to select NAVIGATION ICON")
         return False
